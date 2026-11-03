@@ -1,0 +1,12 @@
+import type {Citation} from './api';
+export type VisualKind='presentation'|'infographic';
+export type VisualParams={purpose:string;audience:string;topic:string;mode:'presentation'|'reading';count:number;template:'business'|'teaching'|'research';color:string;form:'overview'|'comparison'|'process';orientation:'portrait'|'landscape';density:'low'|'standard'|'high'};
+export type VisualPoint={text:string;refs:number[];basis:'fact'|'opinion'|'gap'};
+export type VisualPage={id:string;title:string;claim:string;layout:string;points:VisualPoint[];notes:string;edited:boolean;data:{label:string;raw:string[];operation:string;unit:string;period:string;refs:number[];value?:number;method?:string}[];columns?:string[];rows?:{cells:string[];refs:number[]}[]};
+export type VisualContent={title:string;pages:VisualPage[]};
+export type VisualJob={id:string;kind:string;revision:number;status:string;phase:string;error?:string;attempts:number;model?:string;result:{completed?:number;total?:number;failed_page?:string;published_revision?:number}};
+export type Visual={id:string;kind:VisualKind;title:string;revision:number;stage:string;params:VisualParams;content:VisualContent;evidence:(Citation&{kind:string;note_id?:string;state:string})[];jobs:VisualJob[];source_state:string;updated_at:string;versions:{revision:number;created_at:string;stage:string}[];files:{id:string;format:string;ordinal:number;revision:number;job_id:string;purpose:string}[]};
+export const initialParams:VisualParams={purpose:'',audience:'',topic:'',mode:'presentation',count:8,template:'business',color:'',form:'overview',orientation:'portrait',density:'standard'};
+export const visualStates:Record<string,string>={queued:'等待处理',running:'正在处理',complete:'已完成',failed:'失败',cancelled:'已取消',outline:'生成大纲',pages:'生成页面',render:'排版与预览',export:'导出文件',stored:'文件已保存',published:'内容已保存'};
+export const layouts:Record<string,string>={cover:'封面',section:'章节页',bullets:'标题与要点',comparison:'双栏对比',timeline:'流程／时间线',chart:'数据图表',sources:'总结与来源',table:'表格'};
+export const newPage=():VisualPage=>({id:'p'+crypto.randomUUID().replaceAll('-',''),title:'新页面',claim:'',layout:'bullets',points:[],notes:'',edited:true,data:[],columns:[],rows:[]});

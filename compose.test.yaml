@@ -1,0 +1,47 @@
+# Isolated test project only. Models are explicitly simulated protocol fixtures.
+# docker compose -p narcissus-test -f compose.yaml -f compose.test.yaml up -d --build
+services:
+  api:
+    environment: &test-model-env
+      ENVIRONMENT: development
+      PUBLIC_ORIGIN: http://localhost:3100
+      CHAT_API_KEY: test-fixture-not-a-real-key
+      CHAT_BASE_URL: http://model-fixture:8090/v1
+      CHAT_MODEL: protocol-fixture
+      EMBEDDING_API_KEY: test-fixture-not-a-real-key
+      EMBEDDING_BASE_URL: http://model-fixture:8090/v1
+      EMBEDDING_MODEL: protocol-fixture
+      EMBEDDING_DIMENSIONS: 8
+      TTS_API_KEY: test-fixture-not-a-real-key
+      TTS_BASE_URL: http://model-fixture:8090/v1
+      TTS_MODEL: step-tts-mini
+      TTS_TIMEOUT_SECONDS: 3
+      AUDIO_DAILY_LIMIT: 100
+      GENERATION_TIMEOUT_SECONDS: 12
+  worker:
+    environment: *test-model-env
+  beat:
+    environment: *test-model-env
+  model-fixture:
+    build: ./backend
+    command: uvicorn tests.model_fixture:app --host 0.0.0.0 --port 8090
+  web:
+    ports: !override ['127.0.0.1:3100:3000']
+  tester:
+    build: ./backend
+    profiles: [test]
+    environment:
+      TTS_API_KEY: test-fixture-not-a-real-key
+      TTS_BASE_URL: http://model-fixture:8090/v1
+      TTS_TIMEOUT_SECONDS: 3
+      TEST_BASE_URL: http://web:3000
+      TEST_MODEL_URL: http://model-fixture:8090
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-narcissus}:${POSTGRES_PASSWORD:-narcissus_dev_password}@db:5432/${POSTGRES_DB:-narcissus}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-narcissus_dev_redis}@redis:6379/0
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-narcissus_dev}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-narcissus_dev_password}
+      EMBEDDING_BASE_URL: http://model-fixture:8090/v1
+      EMBEDDING_MODEL: protocol-fixture
+      EMBEDDING_DIMENSIONS: 8
+    command: pytest -q -p no:cacheprovider tests/test_unit.py tests/test_integration.py tests/test_boundaries.py tests/test_v2.py tests/test_v3.py tests/test_v4.py tests/test_document_repair.py tests/test_v5.py tests/test_v6.py tests/test_v7.py

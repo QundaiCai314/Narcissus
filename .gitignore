@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+node_modules/
+.next/
+*.tsbuildinfo
+.ruff_cache/
+__pycache__/
+.pytest_cache/
+.venv/
+*.pyc
+work/
+backups/
+frontend/public/pdfjs/

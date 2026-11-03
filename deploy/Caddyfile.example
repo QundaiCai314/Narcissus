@@ -1,0 +1,11 @@
+# Replace with your domain; Caddy must run on the same host as Compose.
+notes.example.com {
+    encode gzip zstd
+    request_body {
+        max_size 210763776
+    }
+    reverse_proxy 127.0.0.1:3000 {
+        flush_interval -1
+    }
+    header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+}
