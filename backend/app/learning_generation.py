@@ -13,6 +13,7 @@ from .generation import build_evidence
 from .model_service import chat_stream, ModelError
 from .config import settings
 from .evidence_policy import READING_RULES
+from . import quiz_prompts, quiz_rules
 from .learning_validation import (
     validate_result,
     review_result,
@@ -155,10 +156,12 @@ async def generate_and_review(set_id, claim, kind, params, sources, feedback, us
         "evidence": [{k: s[k] for k in ("label", "filename", "text")} for s in sources],
         "previous_validation_error": feedback,
     }
+    if kind == "quiz":
+        payload["question_plan"] = quiz_rules.plan(params)
     async with asyncio.timeout(settings().generation_timeout_seconds):
         raw = await complete(
             [
-                {"role": "system", "content": SYSTEM + "\n" + SCHEMA[kind]},
+                {"role": "system", "content": (SYSTEM.replace("每个答案和解释只复述该条 refs 内清晰可读的结论", "每个答案和解释必须基于该条 refs 内清晰可读的结论，允许有完整过程的数学与逻辑推导").replace("少用判断题", "按用户所选题型出题") + "\n" + quiz_prompts.RULES + quiz_prompts.SCHEMA) if kind == "quiz" else SYSTEM + "\n" + SCHEMA[kind]},
                 {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
             ],
             usages,
@@ -182,7 +185,7 @@ async def generate_and_review(set_id, claim, kind, params, sources, feedback, us
             [
                 {
                     "role": "system",
-                    "content": REVIEW + ("\n" + QUIZ_REVIEW if kind == "quiz" else "") + ("\n导图根节点是服务端的导航文字，只需审核其余知识点的标题、说明和引用。" if kind == "mindmap" else ""),
+                    "content": (quiz_prompts.REVIEW + READING_RULES if kind == "quiz" else REVIEW) + ("\n导图根节点是服务端的导航文字，只需审核其余知识点的标题、说明和引用。" if kind == "mindmap" else ""),
                 },
                 {
                     "role": "user",
@@ -198,7 +201,7 @@ async def generate_and_review(set_id, claim, kind, params, sources, feedback, us
                                         k: v
                                         for k, v in i.items()
                                         if k
-                                        not in ("correct_index", "explanation", "point")
+                                        not in ("correct_index", "correct_indices", "answer", "rubric", "explanation", "point")
                                     }
                                     for i in result["items"]
                                 ]
@@ -233,7 +236,7 @@ async def generate_and_review(set_id, claim, kind, params, sources, feedback, us
                 async with semaphore:
                     proof = await complete(
                         [
-                            {"role": "system", "content": EXPLANATION_REVIEW},
+                            {"role": "system", "content": quiz_prompts.PROOF},
                             {
                                 "role": "user",
                                 "content": json.dumps(
@@ -269,6 +272,9 @@ async def generate_and_review(set_id, claim, kind, params, sources, feedback, us
                 raise InsufficientEvidence(
                     "当前资料无法支持题目的答案与解释，请补充资料或调整主题"
                 )
+            for item in accepted:
+                item.pop("review_solution", None)
+            accepted.sort(key=lambda q: (params.get("question_types") or ["single"]).index(quiz_rules.kind(q)))
             result = {"items": accepted}
         return result, rejected + quote_rejected
 
@@ -419,7 +425,7 @@ def process(set_id):
     except InsufficientEvidence as exc:
         fail_job(set_id, claim, str(exc), True, usages)
     except ModelError as exc:
-        fail_job(set_id, claim, str(exc), "尚未配置" in str(exc), usages)
+        fail_job(set_id, claim, str(exc), exc.permanent or "尚未配置" in str(exc), usages)
     except TimeoutError:
         fail_job(
             set_id, claim, "学习内容生成超时，请缩小主题或数量后重试", usages=usages

@@ -1,5 +1,22 @@
 import { Citation, WritingCitation } from "./api";
 export type LearningKind = "mindmap" | "flashcards" | "quiz";
+export const questionTypes = {
+  single: { label: "单项选择题", points: 2 },
+  multiple: { label: "多项选择题", points: 3 },
+  true_false: { label: "判断题", points: 2 },
+  fill_blank: { label: "填空题", points: 4 },
+  term: { label: "名词解释", points: 5 },
+  short_answer: { label: "简答题", points: 8 },
+  calculation: { label: "计算与证明题", points: 10 },
+  essay: { label: "论述题", points: 12 },
+  case_analysis: { label: "材料分析题", points: 12 },
+} as const;
+export type QuestionType = keyof typeof questionTypes;
+export const objectiveTypes: QuestionType[] = [
+  "single",
+  "multiple",
+  "true_false",
+];
 export type LearningItem = {
   id: string;
   title?: string;
@@ -21,6 +38,11 @@ export type AttemptBrief = {
   correct: number;
   total: number;
   score: number | null;
+  delivery?: "practice" | "exam";
+  earned_points?: number;
+  total_points?: number;
+  pending_review?: number;
+  self_assessed?: boolean;
 };
 export type LearningSet = {
   id: string;
@@ -33,6 +55,9 @@ export type LearningSet = {
     audience: string;
     difficulty: string;
     count: number;
+    question_types?: QuestionType[];
+    study_stage?: "university" | "postgraduate";
+    subject?: string;
   };
   status: string;
   phase: string;
@@ -64,8 +89,18 @@ export type QuizQuestion = {
   options: string[];
   point?: string;
   selected: number | null;
+  question_type?: QuestionType;
+  points?: number;
+  selected_indices?: number[];
+  text?: string;
+  correct_indices?: number[];
+  answer?: string;
+  rubric?: { id: string; text: string; points: number }[];
+  rubric_scores?: Record<string, number>;
+  grading?: "automatic" | "self_pending" | "self_assessed" | "unanswered";
+  earned?: number | null;
   submitted: boolean;
-  correct?: boolean;
+  correct?: boolean | null;
   correct_index?: number;
   explanation?: string;
   refs?: number[];

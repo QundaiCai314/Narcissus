@@ -48,6 +48,8 @@ def synthesize(text, voice, model, base_url):
             with client.stream("POST", base_url.rstrip("/") + "/audio/speech",
                 headers={"Authorization": "Bearer " + s.tts_api_key},
                 json={"model": model, "input": text, "voice": voice, "response_format": "wav", "sample_rate": 24000, "speed": 1.0}) as response:
+                if response.status_code == 402:
+                    raise SpeechError("语音模型额度不足或账单不可用，请检查服务商余额与套餐后再重试")
                 if response.status_code in (400, 401, 403, 404, 422, 429):
                     raise SpeechError("语音服务拒绝请求，请检查模型、声音、凭证或额度", retryable=response.status_code == 429)
                 if response.status_code != 200:

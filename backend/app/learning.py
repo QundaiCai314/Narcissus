@@ -6,9 +6,9 @@ import random
 from typing import Literal
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, StrictInt
 from sqlalchemy import select, func
-from . import access
+from . import access, quiz_rules
 from .db import db_session
 from .errors import fail
 from .models import LearningSet, CardProgress, QuizAttempt, Document, Chunk, now, uid
@@ -25,7 +25,10 @@ class GenerateInput(BaseModel):
     topic: str = Field(default="", max_length=500)
     audience: str = Field(default="", max_length=200)
     difficulty: Literal["easy", "standard", "advanced"] = "standard"
-    count: int | None = None
+    count: int | None = Field(default=None, strict=True)
+    question_types: list[Literal["single", "multiple", "true_false", "fill_blank", "term", "short_answer", "calculation", "essay", "case_analysis"]] = Field(default_factory=lambda: ["single"], min_length=1, max_length=9)
+    study_stage: Literal["university", "postgraduate"] = "university"
+    subject: str = Field(default="", max_length=80)
     request_key: UUID
 
     @model_validator(mode="after")
@@ -43,6 +46,9 @@ class GenerateInput(BaseModel):
             self.document_ids
         ):
             raise ValueError("数量不在允许范围或来源重复")
+        self.subject = self.subject.strip()
+        if self.kind == "quiz" and (len(set(self.question_types)) != len(self.question_types) or len(self.question_types) > self.count):
+            raise ValueError("题型不能重复，且总题数不能少于题型数")
         return self
 
 
@@ -113,25 +119,23 @@ def card_items(row):
     return [c for c in row.result.get("items", []) if c["id"] not in row.removed_cards]
 
 
+@router.get("/learning-options")
+def learning_options(user=Depends(current_user)):
+    return {"quiz_version": 2, "question_types": [
+        {"value": k, "label": v[0], "points": v[1]} for k, v in quiz_rules.TYPES.items()
+    ]}
+
+
 def score(attempt):
-    submitted = [a for a in attempt.answers.values() if a.get("submitted")]
-    correct = sum(a["correct"] for a in submitted)
-    total = len(attempt.question_ids)
-    return {
-        "answered": len(submitted),
-        "correct": correct,
-        "total": total,
-        "score": round(correct * 100 / total)
-        if attempt.status == "complete" and total
-        else None,
-    }
+    return quiz_rules.summary(attempt)
 
 
 def attempt_brief(a):
     return {
         "id": a.id,
         "status": a.status,
-        "mode": a.mode,
+        "mode": "wrong" if a.mode in ("wrong", "wrong_exam") else "all",
+        "delivery": "exam" if a.mode in ("exam", "wrong_exam") else "practice",
         "created_at": a.created_at,
         "completed_at": a.completed_at,
         **score(a),
@@ -189,7 +193,7 @@ def serialize(db, row, user_id, full=False):
         if row.kind == "quiz":
             # Explicit allowlist: no correct choices, explanations, point details, quotes or evidence before submission.
             data["items"] = [
-                {k: q[k] for k in ("id", "question", "options")}
+                quiz_rules.public_question(q)
                 for q in row.result["items"]
             ]
             data["citations"] = []
@@ -216,6 +220,8 @@ def enqueue(db, user, nb_id, data, previous=None):
         "count": data.count,
         "max_depth": 3,
     }
+    if data.kind == "quiz":
+        params.update(question_types=data.question_types, study_stage=data.study_stage, subject=data.subject)
     if existing:
         if (
             existing.kind != data.kind
@@ -322,7 +328,7 @@ def regenerate(
         kind=row.kind,
         document_ids=[s["id"] for s in row.sources],
         request_key=data.request_key,
-        **{k: row.params[k] for k in ("topic", "audience", "difficulty", "count")},
+        **{k: v for k, v in row.params.items() if k in ("topic", "audience", "difficulty", "count", "question_types", "study_stage", "subject")},
     )
     return serialize(db, enqueue(db, user, row.notebook_id, value, row), user.id, True)
 
@@ -485,6 +491,7 @@ def delete_card(
 
 
 class AttemptInput(RequestKey):
+    delivery: Literal["practice", "exam"] = "practice"
     mode: Literal["all", "wrong"] = "all"
     previous_id: str | None = None
 
@@ -509,20 +516,21 @@ def attempt_json(db, row, a):
     items, labels, weak = [], set(), {}
     for qid in a.question_ids:
         q, answer = questions[qid], a.answers.get(qid, {})
-        public = {k: q[k] for k in ("id", "question", "options")}
-        public.update(
-            selected=answer.get("selected"), submitted=bool(answer.get("submitted"))
-        )
+        public = quiz_rules.public_question(q)
+        public.update(selected=answer.get("selected"), selected_indices=answer.get("selected_indices", []),
+                      text=answer.get("text", ""), submitted=bool(answer.get("submitted")))
         if answer.get("submitted"):
-            public.update(
-                point=q["point"],
-                correct=answer["correct"],
-                correct_index=q["correct_index"],
-                explanation=q["explanation"],
-                refs=q["refs"],
-            )
+            public.update(point=q["point"], correct=answer.get("correct"),
+                          earned=answer.get("earned", int(bool(answer.get("correct")))),
+                          grading=answer.get("grading", "automatic"),
+                          explanation=q["explanation"], refs=q["refs"])
+            if quiz_rules.kind(q) in quiz_rules.OBJECTIVE:
+                public.update(correct_indices=q.get("correct_indices", [q.get("correct_index")]))
+                if "correct_index" in q: public["correct_index"] = q["correct_index"]
+            else:
+                public.update(answer=q["answer"], rubric=q["rubric"], rubric_scores=answer.get("rubric_scores", {}))
             labels.update(q["refs"])
-            if not answer["correct"]:
+            if answer.get("correct") is False:
                 point = weak.setdefault(
                     q["point"], {"point": q["point"], "wrong": 0, "refs": []}
                 )
@@ -552,10 +560,11 @@ def start_attempt(
             QuizAttempt.request_key == str(data.request_key),
         )
     )
+    stored_mode = ("wrong_exam" if data.mode == "wrong" else "exam") if data.delivery == "exam" else data.mode
     if existing:
         if (
             existing.set_id != set_id
-            or existing.mode != data.mode
+            or existing.mode != stored_mode
             or existing.previous_id != data.previous_id
         ):
             fail(409, "key_reused", "此请求编号已用于其他测验")
@@ -581,8 +590,9 @@ def start_attempt(
         user_id=user.id,
         request_key=str(data.request_key),
         previous_id=data.previous_id,
-        mode=data.mode,
+        mode=stored_mode,
         question_ids=ids,
+        answers={q["id"]: {"max_points": quiz_rules.points(q)} for q in row.result["items"] if q["id"] in ids},
     )
     db.add(a)
     db.commit()
@@ -623,68 +633,116 @@ def get_attempt(attempt_id: str, user=Depends(current_user), db=Depends(db_sessi
     return attempt_json(db, row, a)
 
 
-class AnswerInput(BaseModel):
-    selected: int = Field(ge=0, le=3, strict=True)
-    revision: int = Field(ge=1)
+class RevisionInput(BaseModel):
+    revision: int = Field(ge=1, strict=True)
+
+
+class AnswerInput(RevisionInput):
+    selected: int | None = Field(default=None, ge=0, le=3, strict=True)
+    selected_indices: list[StrictInt] | None = Field(default=None, max_length=4)
+    text: str | None = Field(default=None, max_length=12000)
+
+
+class AssessmentInput(RevisionInput):
+    rubric_scores: dict[str, StrictInt] = Field(max_length=8)
+
+
+def check_revision(a, revision):
+    if a.revision != revision:
+        fail(409, "stale_attempt", "作答进度已在其他页面更新，请重新加载后继续")
+
+
+def question_in(row, a, question_id):
+    if question_id not in a.question_ids:
+        fail(404, "question_not_found", "题目不在本次练习中")
+    return next(q for q in row.result["items"] if q["id"] == question_id)
+
+
+def validated_response(q, data, allow_empty=True):
+    try:
+        return quiz_rules.response_value(q, data, allow_empty)
+    except ValueError as e:
+        fail(422, "invalid_answer", str(e))
+
+
+def finalize_attempt(a):
+    quiz_rules.finish(a)
+    if a.status == "complete": a.completed_at = now()
 
 
 @router.patch("/quiz-attempts/{attempt_id}/answers/{question_id}")
-def save_answer(
-    attempt_id: str,
-    question_id: str,
-    data: AnswerInput,
-    user=Depends(current_user),
-    db=Depends(db_session),
-):
+def save_answer(attempt_id: str, question_id: str, data: AnswerInput,
+                user=Depends(current_user), db=Depends(db_session)):
     row, a = owned_attempt(db, user.id, attempt_id, True)
-    if question_id not in a.question_ids:
-        fail(404, "question_not_found", "题目不在本次测验中")
+    q = question_in(row, a, question_id)
+    if a.status != "active" or a.answers.get(question_id, {}).get("submitted"):
+        fail(409, "already_submitted", "本题已提交，不能修改；可以重新练习")
+    response = validated_response(q, data)
     old = a.answers.get(question_id, {})
-    if old.get("submitted"):
-        fail(409, "already_submitted", "本题已提交，不能修改；可以开始新一轮测验")
-    if old.get("selected") == data.selected:
-        return attempt_json(db, row, a)
-    if a.revision != data.revision:
-        fail(409, "stale_attempt", "作答进度已更新，请重新加载")
-    a.answers = {
-        **a.answers,
-        question_id: {"selected": data.selected, "submitted": False},
-    }
+    if all(old.get(k) == v for k, v in response.items()): return attempt_json(db, row, a)
+    check_revision(a, data.revision)
+    a.answers = {**a.answers, question_id: dict(response, max_points=quiz_rules.points(q), submitted=False)}
     a.revision += 1
     db.commit()
     return attempt_json(db, row, a)
 
 
 @router.post("/quiz-attempts/{attempt_id}/answers/{question_id}/submit")
-def submit_answer(
-    attempt_id: str,
-    question_id: str,
-    data: AnswerInput,
-    user=Depends(current_user),
-    db=Depends(db_session),
-):
+def submit_answer(attempt_id: str, question_id: str, data: AnswerInput,
+                  user=Depends(current_user), db=Depends(db_session)):
     row, a = owned_attempt(db, user.id, attempt_id, True)
-    if question_id not in a.question_ids:
-        fail(404, "question_not_found", "题目不在本次测验中")
+    q = question_in(row, a, question_id)
+    if a.mode in ("exam", "wrong_exam"):
+        fail(409, "exam_requires_finish", "整卷自测请统一交卷，交卷前不显示答案")
+    response = validated_response(q, data, False)
     old = a.answers.get(question_id, {})
     if old.get("submitted"):
-        if old["selected"] != data.selected:
+        if any(old.get(k) != v for k, v in response.items()):
             fail(409, "already_submitted", "本题已提交，不能修改答案")
         return attempt_json(db, row, a)
-    if a.revision != data.revision:
-        fail(409, "stale_attempt", "作答进度已更新，请重新加载")
-    q = next(q for q in row.result["items"] if q["id"] == question_id)
-    a.answers = {
-        **a.answers,
-        question_id: {
-            "selected": data.selected,
-            "submitted": True,
-            "correct": data.selected == q["correct_index"],
-        },
-    }
+    check_revision(a, data.revision)
+    a.answers = {**a.answers, question_id: dict(quiz_rules.grade(q, response), max_points=quiz_rules.points(q))}
     a.revision += 1
-    if all(a.answers.get(i, {}).get("submitted") for i in a.question_ids):
-        a.status, a.completed_at = "complete", now()
+    finalize_attempt(a)
+    db.commit()
+    return attempt_json(db, row, a)
+
+
+@router.post("/quiz-attempts/{attempt_id}/finish")
+def finish_attempt(attempt_id: str, data: RevisionInput, user=Depends(current_user), db=Depends(db_session)):
+    row, a = owned_attempt(db, user.id, attempt_id, True)
+    if a.status in ("complete", "reviewing"): return attempt_json(db, row, a)
+    check_revision(a, data.revision)
+    questions = {q["id"]: q for q in row.result["items"]}
+    answers = dict(a.answers)
+    for qid in a.question_ids:
+        q = questions[qid]
+        if not answers.get(qid, {}).get("submitted"):
+            answers[qid] = dict(quiz_rules.grade(q, answers.get(qid, {})), max_points=quiz_rules.points(q))
+    a.answers = answers
+    a.revision += 1
+    finalize_attempt(a)
+    db.commit()
+    return attempt_json(db, row, a)
+
+
+@router.post("/quiz-attempts/{attempt_id}/answers/{question_id}/assess")
+def self_assess(attempt_id: str, question_id: str, data: AssessmentInput,
+                user=Depends(current_user), db=Depends(db_session)):
+    row, a = owned_attempt(db, user.id, attempt_id, True)
+    q = question_in(row, a, question_id)
+    old = a.answers.get(question_id, {})
+    if old.get("grading") == "self_assessed":
+        if old.get("rubric_scores") == data.rubric_scores: return attempt_json(db, row, a)
+        fail(409, "already_assessed", "本题自评已确认，请在新一轮练习中重新作答")
+    check_revision(a, data.revision)
+    try:
+        answer = quiz_rules.assess(q, old, data.rubric_scores)
+    except ValueError as e:
+        fail(422, "invalid_assessment", str(e))
+    a.answers = {**a.answers, question_id: answer}
+    a.revision += 1
+    finalize_attempt(a)
     db.commit()
     return attempt_json(db, row, a)
 

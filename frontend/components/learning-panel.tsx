@@ -8,6 +8,8 @@ import {
   OnCitation,
   kindNames,
   phaseNames,
+  questionTypes,
+  QuestionType,
 } from "@/lib/learning";
 import { MindMap } from "./mind-map";
 import { Flashcards } from "./flashcards";
@@ -24,7 +26,12 @@ export function LearningPanel({
   docs: Document[];
   onCitation: OnCitation;
   onAsk: (context: LearningContext, title: string, sourceIds: string[]) => void;
-  studioRequest?: { key: number; id?: string; kind?: LearningKind; documentIds?: string[] };
+  studioRequest?: {
+    key: number;
+    id?: string;
+    kind?: LearningKind;
+    documentIds?: string[];
+  };
 }) {
   const [items, setItems] = useState<LearningSet[]>([]),
     [total, setTotal] = useState(0),
@@ -40,8 +47,35 @@ export function LearningPanel({
     [difficulty, setDifficulty] = useState("standard"),
     [count, setCount] = useState(15),
     [filter, setFilter] = useState("all");
+  const [quizTypes, setQuizTypes] = useState<QuestionType[]>([
+    "single",
+    "multiple",
+    "short_answer",
+  ]);
+  const [studyStage, setStudyStage] = useState("university"),
+    [subject, setSubject] = useState("");
+  const [quizAvailable, setQuizAvailable] = useState<boolean | null>(null);
+  useEffect(() => {
+    api<{ quiz_version: number }>("/learning-options")
+      .then((v) => setQuizAvailable(v.quiz_version >= 2))
+      .catch(() => setQuizAvailable(false));
+  }, []);
+  const quizPlan = quizTypes.map((type, i) => ({
+    type,
+    count:
+      Math.floor(count / quizTypes.length) +
+      (i < count % quizTypes.length ? 1 : 0),
+  }));
+  const quizMax = quizPlan.reduce(
+    (n, p) => n + p.count * questionTypes[p.type].points,
+    0,
+  );
   const requestKey = useRef<{ signature: string; key: string } | null>(null);
   const selected = useRef("");
+  const scrollArea = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    scrollArea.current?.scrollTo({ top: 0 });
+  }, [row?.id, form]);
   const loadedPages = useRef(1);
   const handledRequest = useRef(0);
   useEffect(() => {
@@ -58,10 +92,16 @@ export function LearningPanel({
     }
   }, [studioRequest]);
   const load = useCallback(async () => {
-    const pages = await Promise.all(Array.from({ length: loadedPages.current }, (_, i) =>
-      api<Page<LearningSet>>(`/notebooks/${notebookId}/learning?limit=100&offset=${i * 100}`),
-    ));
-    setItems([...new Map(pages.flatMap(p => p.items).map(x => [x.id, x])).values()]);
+    const pages = await Promise.all(
+      Array.from({ length: loadedPages.current }, (_, i) =>
+        api<Page<LearningSet>>(
+          `/notebooks/${notebookId}/learning?limit=100&offset=${i * 100}`,
+        ),
+      ),
+    );
+    setItems([
+      ...new Map(pages.flatMap((p) => p.items).map((x) => [x.id, x])).values(),
+    ]);
     setTotal(pages[0].total);
   }, [notebookId]);
   useEffect(() => {
@@ -106,7 +146,15 @@ export function LearningPanel({
   function newForm(documentIds?: string[]) {
     setForm(true);
     setError("");
-    setSourceIds(docs.filter((d) => d.status === "ready" && (!documentIds || documentIds.includes(d.id))).map((d) => d.id));
+    setSourceIds(
+      docs
+        .filter(
+          (d) =>
+            d.status === "ready" &&
+            (!documentIds || documentIds.includes(d.id)),
+        )
+        .map((d) => d.id),
+    );
     requestKey.current = null;
   }
   async function generate() {
@@ -119,6 +167,9 @@ export function LearningPanel({
       audience,
       difficulty,
       count: kind === "mindmap" ? 40 : count,
+      ...(kind === "quiz"
+        ? { question_types: quizTypes, study_stage: studyStage, subject }
+        : {}),
     };
     const signature = JSON.stringify(params);
     if (requestKey.current?.signature !== signature)
@@ -177,7 +228,11 @@ export function LearningPanel({
           <span className="eyebrow">从理解，到掌握</span>
           <h2>主动学习</h2>
         </div>
-        <button className="button primary" onClick={() => newForm()} disabled={busy}>
+        <button
+          className="button primary"
+          onClick={() => newForm()}
+          disabled={busy}
+        >
           ＋ 创建学习内容
         </button>
       </div>
@@ -235,7 +290,9 @@ export function LearningPanel({
                   `/notebooks/${notebookId}/learning?limit=100&offset=${items.length}`,
                 );
                 loadedPages.current += 1;
-                setItems((v) => [...new Map([...v, ...p.items].map(x => [x.id, x])).values()]);
+                setItems((v) => [
+                  ...new Map([...v, ...p.items].map((x) => [x.id, x])).values(),
+                ]);
               } catch (e) {
                 setError(errorText(e));
               }
@@ -245,10 +302,12 @@ export function LearningPanel({
           </button>
         )}
       </div>
-      <div className="writing-scroll learning-scroll">
+      <div className="writing-scroll learning-scroll" ref={scrollArea}>
         {form ? (
           <div className="summary-form learning-form">
-            <h3>把资料变成学习内容</h3>
+            <h3>
+              {kind === "quiz" ? "为这一轮复习出题" : "把资料变成学习内容"}
+            </h3>
             <p className="muted">
               仅以选定原始资料为事实依据。可用笔记或总结描述学习目标，但不会把其中观点当作已核实事实。
             </p>
@@ -294,6 +353,37 @@ export function LearningPanel({
                 <p>请先上传并等待资料处理完成。</p>
               )}
             </fieldset>
+            {kind === "quiz" && (
+              <div className="exam-settings">
+                <h4>出题范围与目标</h4>
+                <div className="learning-form-grid">
+                  <label>
+                    复习阶段
+                    <select
+                      value={studyStage}
+                      onChange={(e) => setStudyStage(e.target.value)}
+                    >
+                      <option value="university">大学课程 · 期末复习</option>
+                      <option value="postgraduate">
+                        考研复习 · 专业与基础课
+                      </option>
+                    </select>
+                  </label>
+                  <label>
+                    课程或科目
+                    <input
+                      value={subject}
+                      maxLength={80}
+                      onChange={(e) => setSubject(e.target.value)}
+                      placeholder="例如：高等数学、教育学、数据结构"
+                    />
+                  </label>
+                </div>
+                <p className="muted">
+                  以所选讲义、教材或复习资料为范围。可在主题中填写章节与考点；练习题不等同于官方真题。
+                </p>
+              </div>
+            )}
             <label>
               学习主题或目标（可选）
               <textarea
@@ -314,7 +404,16 @@ export function LearningPanel({
                     key={preset}
                     type="button"
                     className="preset-chip"
-                    onClick={() => setTopic(preset)}
+                    onClick={() =>
+                      setTopic((v) =>
+                        v
+                          ? (v.includes(preset) ? v : `${v}；${preset}`).slice(
+                              0,
+                              500,
+                            )
+                          : preset,
+                      )
+                    }
                   >
                     {preset}
                   </button>
@@ -327,7 +426,11 @@ export function LearningPanel({
                 value={audience}
                 maxLength={200}
                 onChange={(e) => setAudience(e.target.value)}
-                placeholder="例如：初次阅读者"
+                placeholder={
+                  kind === "quiz"
+                    ? "例如：已学完课程，重点巩固易错点"
+                    : "例如：初次阅读者"
+                }
               />
             </label>
             <div className="learning-form-grid">
@@ -365,16 +468,115 @@ export function LearningPanel({
                 </label>
               )}
             </div>
+            {kind === "quiz" && (
+              <fieldset className="exam-types">
+                <legend>题型与组卷方案</legend>
+                <div className="exam-presets">
+                  <button
+                    type="button"
+                    className="button"
+                    onClick={() =>
+                      setQuizTypes(["single", "multiple", "short_answer"])
+                    }
+                  >
+                    课程基础
+                  </button>
+                  <button
+                    type="button"
+                    className="button"
+                    onClick={() =>
+                      setQuizTypes(["single", "fill_blank", "calculation"])
+                    }
+                  >
+                    理工计算
+                  </button>
+                  <button
+                    type="button"
+                    className="button"
+                    onClick={() =>
+                      setQuizTypes([
+                        "term",
+                        "short_answer",
+                        "essay",
+                        "case_analysis",
+                      ])
+                    }
+                  >
+                    人文社科
+                  </button>
+                  <button
+                    type="button"
+                    className="button"
+                    onClick={() =>
+                      setQuizTypes(["single", "multiple", "case_analysis"])
+                    }
+                  >
+                    选择与材料分析
+                  </button>
+                </div>
+                <div className="exam-type-grid">
+                  {Object.entries(questionTypes).map(([key, spec]) => (
+                    <label className="source-option" key={key}>
+                      <input
+                        type="checkbox"
+                        checked={quizTypes.includes(key as QuestionType)}
+                        onChange={(e) =>
+                          setQuizTypes((v) =>
+                            (
+                              Object.keys(questionTypes) as QuestionType[]
+                            ).filter((t) =>
+                              t === key ? e.target.checked : v.includes(t),
+                            ),
+                          )
+                        }
+                      />
+                      {spec.label}
+                      <small>{spec.points} 分/题</small>
+                    </label>
+                  ))}
+                </div>
+                <p className="exam-plan" role="status">
+                  {quizPlan
+                    .map((p) => `${questionTypes[p.type].label} ${p.count} 题`)
+                    .join(" · ") || "请至少选择一种题型"}
+                  {quizTypes.length > 0 && `；共 ${count} 题 / ${quizMax} 分`}
+                </p>
+                {quizTypes.length > count && (
+                  <p role="alert">
+                    总题数不能少于题型数，请增加题数或减少题型。
+                  </p>
+                )}
+                <p className="muted">
+                  按所选题型顺序平均分配题数，余题优先分配给前面的题型。多选题全部选对得分，少选、多选、错选均不得分。非选择题按评分要点自评。
+                </p>
+                {quizAvailable === false && (
+                  <p role="alert">
+                    出题服务尚未升级或暂不可用，请稍后重新打开；当前不会提交不受支持的题型。
+                  </p>
+                )}
+              </fieldset>
+            )}
             <p className="muted">
               资料不足时会减少数量或明确说明。生成后先核对证据，再整体显示成果。
             </p>
             <div className="learning-toolbar">
               <button
                 className="button primary"
-                disabled={busy || !sourceIds.length}
+                disabled={
+                  busy ||
+                  !sourceIds.length ||
+                  (kind === "quiz" &&
+                    (!quizAvailable ||
+                      !quizTypes.length ||
+                      quizTypes.length > count))
+                }
                 onClick={generate}
               >
-                {busy ? "正在提交…" : "开始生成"}
+                {busy
+                  ? "正在提交…"
+                  : kind === "quiz"
+                    ? "确认方案，开始出题"
+                    : "开始生成"}
               </button>
               <button
                 className="button"
@@ -437,15 +639,16 @@ export function LearningPanel({
                     >
                       生成新版
                     </button>
-                    {["failed", "cancelled"].includes(row.status) && row.sources.every(s => s.state === "active") && (
-                      <button
-                        className="button"
-                        disabled={busy}
-                        onClick={() => task("retry")}
-                      >
-                        重试生成
-                      </button>
-                    )}
+                    {["failed", "cancelled"].includes(row.status) &&
+                      row.sources.every((s) => s.state === "active") && (
+                        <button
+                          className="button"
+                          disabled={busy}
+                          onClick={() => task("retry")}
+                        >
+                          重试生成
+                        </button>
+                      )}
                   </>
                 )}
               </div>

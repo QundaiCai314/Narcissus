@@ -4,6 +4,7 @@ import json
 import re
 import unicodedata
 from .model_service import ModelError
+from .quiz_rules import validate_question, kind as question_kind, OBJECTIVE, plan
 
 
 class InsufficientEvidence(ModelError):
@@ -174,37 +175,25 @@ def validate_result(raw, kind, params, sources, check_tree=True):
                 parent_id=item.get("parent_id"),
             )
         else:
-            question = text(item, "question", 400)
+            question = text(item, "question", 2400 if kind == "quiz" else 400)
             if fingerprint(question) in seen_questions:
                 raise ModelError("生成内容含重复问题，请减少数量或更换知识点")
             seen_questions.add(fingerprint(question))
             clean.update(
                 question=question,
-                explanation=text(item, "explanation", 900),
+                explanation=text(item, "explanation", 3000 if kind == "quiz" else 900),
                 point=text(item, "point", 80),
             )
             if kind == "flashcards":
                 clean["answer"] = text(item, "answer", 900)
             else:
-                options = item.get("options")
-                answer = item.get("correct_index")
-                if (
-                    not isinstance(options, list)
-                    or len(options) != 4
-                    or any(
-                        not isinstance(o, str) or not o.strip() or len(o) > 250
-                        for o in options
-                    )
-                ):
-                    raise ModelError("每道单选题必须有四个非空选项")
-                if len({fingerprint(o) for o in options}) != 4:
-                    raise ModelError("单选题选项重复，请生成四个不同且无歧义的选项")
-                if type(answer) is not int or not 0 <= answer <= 3:
-                    raise ModelError(
-                        "单选题必须有唯一正确答案，correct_index 为 0 至 3"
-                    )
-                clean.update(options=[o.strip() for o in options], correct_index=answer)
+                clean.update(validate_question(item, params))
         cleaned.append(clean)
+    if kind == "quiz" and params.get("question_types") and check_tree:
+        limits = {p["question_type"]: p["count"] for p in plan(params)}
+        for t, limit in limits.items():
+            if sum(question_kind(q) == t for q in cleaned) > limit:
+                raise ModelError("某题型超出方案题数，不能用其他题型替代不足的题目")
     if kind == "mindmap" and check_tree:
         nodes = {n["id"]: n for n in cleaned}
         roots = [n for n in cleaned if n["parent_id"] is None]
@@ -280,17 +269,26 @@ def review_result(raw, result, kind):
                 or answer["id"] in checked
             ):
                 raise ModelError("测验复核题目编号无效")
-            options = answer.get("valid_options")
-            if (
-                not isinstance(options, list)
-                or any(type(i) is not int or not 0 <= i <= 3 for i in options)
-                or len(set(options)) != len(options)
-            ):
-                raise ModelError("测验复核选项无效")
-            checked[answer["id"]] = options
+            question = next(q for q in result["items"] if q["id"] == answer["id"])
+            if question_kind(question) in OBJECTIVE:
+                options = answer.get("valid_options")
+                if (not isinstance(options, list) or any(type(i) is not int or not 0 <= i < len(question["options"]) for i in options)
+                        or len(set(options)) != len(options)):
+                    raise ModelError("测验复核选项无效")
+                checked[answer["id"]] = sorted(options)
+            else:
+                solution = answer.get("solution")
+                if not isinstance(solution, str) or not solution.strip() or len(solution) > 6000:
+                    raise ModelError("非选择题复核必须提供独立解答")
+                checked[answer["id"]] = solution.strip()
         for item in result["items"]:
-            if checked.get(item["id"]) != [item["correct_index"]]:
+            if question_kind(item) in OBJECTIVE:
+                if checked.get(item["id"]) != sorted(item.get("correct_indices", [item.get("correct_index")])):
+                    accepted.discard(item["id"])
+            elif item["id"] not in checked:
                 accepted.discard(item["id"])
+            else:
+                item["review_solution"] = checked[item["id"]]
     if kind == "mindmap":
         root = next(n for n in result["items"] if n["parent_id"] is None)
         if root["id"] not in accepted:

@@ -8,7 +8,24 @@ from .config import settings
 
 
 class ModelError(Exception):
-    pass
+    def __init__(self, message, *, permanent=False):
+        super().__init__(message)
+        self.permanent = permanent
+
+
+def provider_error(status, service):
+    """Safe actionable messages, never forward provider bodies or credentials."""
+    if status == 402:
+        return ModelError(f"{service}额度不足或账单不可用，请检查服务商余额与套餐后再重试", permanent=True)
+    if status == 401:
+        return ModelError(f"{service}鉴权失败，请检查 API 密钥是否有效", permanent=True)
+    if status == 403:
+        return ModelError(f"{service}无访问权限，请检查模型授权与账号状态", permanent=True)
+    if status == 404:
+        return ModelError(f"{service}接口或模型不存在，请检查服务地址和模型名称", permanent=True)
+    if status == 429:
+        return ModelError(f"{service}达到调用限制，请检查配额或稍后重试")
+    return ModelError(f"{service}暂时不可用，请稍后重试")
 
 
 def embedding_signature():
@@ -58,6 +75,8 @@ def embed(texts):
             )
             response.raise_for_status()
             return _parse_embeddings(response.json(), len(texts))
+    except httpx.HTTPStatusError as exc:
+        raise provider_error(exc.response.status_code, "向量模型") from None
     except (httpx.HTTPError, ValueError):
         raise ModelError("资料理解服务暂时不可用，请稍后重试") from None
 
@@ -74,6 +93,8 @@ async def embed_query(text):
             response.raise_for_status()
             vectors, usage = _parse_embeddings(response.json(), 1)
             return vectors[0], usage
+    except httpx.HTTPStatusError as exc:
+        raise provider_error(exc.response.status_code, "向量模型") from None
     except (httpx.HTTPError, ValueError):
         raise ModelError("资料理解服务暂时不可用，请稍后重试") from None
 
@@ -134,5 +155,7 @@ async def chat_stream(messages, max_tokens=None, *, json_mode=False, reasoning_e
                     raise ModelError("回答连接意外中断，请重试")
                 if finish_error:
                     raise ModelError(finish_error)
+    except httpx.HTTPStatusError as exc:
+        raise provider_error(exc.response.status_code, "聊天模型") from None
     except (httpx.HTTPError, ValueError):
         raise ModelError("问答服务连接失败或超时，请稍后重试") from None

@@ -78,8 +78,17 @@ export function StudioPanel({
   onCreate: (kind: StudioKind) => void;
   onOpen: (kind: StudioKind, id: string, documentId?: string | null) => void;
 }) {
-  const { writings, learning, audio, visuals, loading, error, more, refresh, loadMore } =
-    useStudio(notebookId, revision);
+  const {
+    writings,
+    learning,
+    audio,
+    visuals,
+    loading,
+    error,
+    more,
+    refresh,
+    loadMore,
+  } = useStudio(notebookId, revision);
   const [filter, setFilter] = useState("all");
   const [limit, setLimit] = useState(16);
 
@@ -96,8 +105,8 @@ export function StudioPanel({
         w.source_state === "deleted"
           ? "原始资料已删除"
           : w.source_state === "changed"
-          ? "资料已更新"
-          : "",
+            ? "资料已更新"
+            : "",
     })),
     ...writings.map((w) => ({
       id: w.id,
@@ -120,14 +129,16 @@ export function StudioPanel({
       extra: w.sources.some((s) => s.state === "deleted")
         ? "原始资料已删除"
         : w.sources.some((s) => s.state === "changed")
-        ? "资料已更新"
-        : w.mastery
-        ? `已掌握 ${w.mastery.mastered}/${w.mastery.total} 张`
-        : w.latest_attempt
-        ? w.latest_attempt.score === null
-          ? `测验进行中 · ${w.latest_attempt.answered}/${w.latest_attempt.total}`
-          : `最近成绩 ${w.latest_attempt.score} 分`
-        : "",
+          ? "资料已更新"
+          : w.mastery
+            ? `已掌握 ${w.mastery.mastered}/${w.mastery.total} 张`
+            : w.latest_attempt
+              ? w.latest_attempt.status === "reviewing"
+                ? `已交卷 · 待自评 ${w.latest_attempt.pending_review || 0} 题`
+                : w.latest_attempt.score === null
+                  ? `测验进行中 · ${w.latest_attempt.answered}/${w.latest_attempt.total}`
+                  : `最近成绩 ${w.latest_attempt.score} 分${w.latest_attempt.self_assessed ? "（含自评）" : ""}`
+              : "",
     })),
     ...audio.map((w) => ({
       id: w.id,
@@ -140,17 +151,20 @@ export function StudioPanel({
       extra: w.sources.some((s) => s.state === "deleted")
         ? "原始资料已删除"
         : w.sources.some((s) => s.state === "changed")
-        ? "资料已更新"
-        : "",
+          ? "资料已更新"
+          : "",
     })),
   ].sort((a, b) => b.date.localeCompare(a.date));
 
   const filtered = entries.filter((e) => {
     if (filter === "all") return true;
     if (filter === "note") return e.kind === "note";
-    if (filter === "summary") return ["summary", "guide", "research"].includes(e.kind);
-    if (filter === "learning") return ["mindmap", "flashcards", "quiz"].includes(e.kind);
-    if (filter === "visual") return ["presentation", "infographic"].includes(e.kind);
+    if (filter === "summary")
+      return ["summary", "guide", "research"].includes(e.kind);
+    if (filter === "learning")
+      return ["mindmap", "flashcards", "quiz"].includes(e.kind);
+    if (filter === "visual")
+      return ["presentation", "infographic"].includes(e.kind);
     if (filter === "audio") return e.kind === "audio";
     return true;
   });
@@ -160,7 +174,11 @@ export function StudioPanel({
       <div className="studio-heading">
         <div>
           <h2>知识沉淀与工作室</h2>
-          <p>{selectedCount ? `基于已选 ${selectedCount} 份资料` : "选择左侧资料，开始研读与沉淀"}</p>
+          <p>
+            {selectedCount
+              ? `基于已选 ${selectedCount} 份资料`
+              : "选择左侧资料，开始研读与沉淀"}
+          </p>
         </div>
         <button
           className="icon-button"
@@ -300,9 +318,7 @@ export function StudioPanel({
                     </span>
                   </div>
                   <small
-                    className={
-                      entry.status === "failed" ? "studio-failed" : ""
-                    }
+                    className={entry.status === "failed" ? "studio-failed" : ""}
                   >
                     {entry.detail}
                     {entry.extra && ` · ${entry.extra}`}
@@ -336,4 +352,3 @@ export function StudioPanel({
     </aside>
   );
 }
-

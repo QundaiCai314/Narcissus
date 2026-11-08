@@ -47,6 +47,7 @@ compose.yaml         应用容器配置
 
 ## 文档与验证
 
+- [大学课程与考研出题流程](docs/QUIZ-WORKFLOW.md)
 - [界面改版与验证](docs/EDITORIAL-REDESIGN.md)
 - [部署配置](docs/DEPLOYMENT.md)
 - [架构与 API](docs/ARCHITECTURE.md)
