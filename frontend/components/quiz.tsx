@@ -27,7 +27,12 @@ const draftOf = (q: QuizQuestion): Draft =>
       : { text: q.text || "" };
 const filled = (d: Draft) =>
   d.selected != null || !!d.selected_indices?.length || !!d.text?.trim();
-const same = (a: Draft, b: Draft) => JSON.stringify(a) === JSON.stringify(b);
+const same = (a: Draft, b: Draft) => {
+  // The API trims written answers; trailing newlines must not trigger endless saves.
+  const normalized = (value: Draft) =>
+    value.text === undefined ? value : { ...value, text: value.text.trim() };
+  return JSON.stringify(normalized(a)) === JSON.stringify(normalized(b));
+};
 
 export function Quiz({
   row,
