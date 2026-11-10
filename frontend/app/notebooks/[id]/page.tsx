@@ -1,5 +1,5 @@
 "use client";
-import { use, FormEvent, useRef, useState, useEffect } from "react";
+import { use, FormEvent, useRef, useState, useEffect, useCallback } from "react";
 import { useWorkspace } from "@/hooks/use-workspace";
 import Link from "next/link";
 import {
@@ -74,6 +74,8 @@ export default function Workspace({
   const [presentationRequest, setPresentationRequest] = useState<StudioRequest>();
   const [infographicRequest, setInfographicRequest] = useState<StudioRequest>();
   const [learningRequest, setLearningRequest] = useState<StudioRequest>();
+  const learningDirty = useRef(false);
+  const reportLearningDirty = useCallback((dirty: boolean) => { learningDirty.current = dirty; }, []);
   const {
     notebook,
     docs,
@@ -112,6 +114,7 @@ export default function Workspace({
   } = useWorkspace(id);
   const chosenSources = docs.filter(d => d.status === "ready" && (selected === null || selected.includes(d.id))).map(d => d.id);
   function openStudio(kind: StudioKind, itemId?: string, documentId?: string | null, pushState: boolean = true) {
+    if (learningDirty.current && !window.confirm("当前作答尚未保存，切换会放弃这些修改。仍要切换吗？")) return;
     const request = { key: ++requestSequence.current, id: itemId, documentIds: chosenSources };
     if (kind === "presentation") { setPresentationRequest(request); setView("presentation");
     } else if (kind === "infographic") { setInfographicRequest(request); setView("infographic");
@@ -141,6 +144,7 @@ export default function Workspace({
   }
 
   function closeStudio(pushState: boolean = true) {
+    if (learningDirty.current && !window.confirm("当前作答尚未保存，离开会放弃这些修改。仍要离开吗？")) return;
     setView("chat");
     if (pushState && typeof window !== "undefined") {
       const q = new URLSearchParams(window.location.search);
@@ -524,7 +528,7 @@ export default function Workspace({
           onOpen={openStudio}
         />
       </main>
-      <WorkspaceDialog open={view !== "chat"} label="工作室内容" onClose={() => closeStudio()}>
+      <WorkspaceDialog className={view === "learning" ? "study-dialog" : ""} open={view !== "chat"} label="工作室内容" onClose={() => closeStudio()}>
         {view !== "chat" && (
           <>
             <div className="studio-detail-heading"><span>工作室 / {{ presentation:"演示文稿", infographic:"信息图", research: "联网研究", guide: "资料导读", note: "笔记", summary: "总结", learning: "主动学习", audio: "音频概览", chat: "对话" }[view]}</span><button className="button" onClick={() => closeStudio()}><X size={16}/>返回对话</button></div>
@@ -572,6 +576,7 @@ export default function Workspace({
             )}
             {view === "learning" && (
               <LearningPanel
+                onDirtyChange={reportLearningDirty}
                 studioRequest={learningRequest}
                 notebookId={id}
                 docs={docs}

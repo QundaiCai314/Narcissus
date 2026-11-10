@@ -38,10 +38,12 @@ export function Quiz({
   row,
   onCitation,
   onChanged,
+  onDirtyChange,
 }: {
   row: LearningSet;
   onCitation: OnCitation;
   onChanged: () => Promise<void>;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [history, setHistory] = useState<AttemptBrief[]>([]),
     [total, setTotal] = useState(0);
@@ -57,6 +59,16 @@ export function Quiz({
   const [saveState, setSaveState] = useState(""),
     [filter, setFilter] = useState("all"),
     [confirmFinish, setConfirmFinish] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const questionRef = useRef<HTMLElement>(null);
+  const focusQuestion = () => {
+    questionRef.current?.scrollIntoView({
+      block: "start",
+      behavior: "instant",
+    });
+    questionRef.current?.focus({ preventScroll: true });
+  };
   const locked = useRef(false),
     alive = useRef(true),
     current = useRef<QuizAttempt | null>(null);
@@ -73,6 +85,10 @@ export function Quiz({
   const dirty = !!q && !q.submitted && !same(draft, draftOf(q));
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+    return () => onDirtyChange?.(false);
+  }, [dirty, onDirtyChange]);
   const setValue = useCallback((value: QuizAttempt) => {
     current.current = value;
     setAttempt(value);
@@ -99,6 +115,7 @@ export function Quiz({
       setIndex(first < 0 ? 0 : first);
       setError("");
       setSaveState("已恢复作答进度");
+      setToolsOpen(false);
     },
     [setValue],
   );
@@ -121,6 +138,12 @@ export function Quiz({
   useEffect(() => {
     setDraft(q ? draftOf(q) : {});
     setRubric(q?.rubric_scores || {});
+  }, [q?.id, attempt?.id]);
+  useEffect(() => {
+    if (q) {
+      setSheetOpen(false);
+      focusQuestion();
+    }
   }, [q?.id, attempt?.id]);
   useEffect(() => {
     const leave = (event: BeforeUnloadEvent) => {
@@ -224,6 +247,7 @@ export function Quiz({
       setFilter("all");
       setConfirmFinish(false);
       setSaveState("已开始，可随时继续");
+      setToolsOpen(false);
       await refreshHistory();
     } catch (e) {
       setError(errorText(e));
@@ -356,90 +380,99 @@ export function Quiz({
           )}
         </div>
       )}
-      <div className="exam-mode-picker">
-        <label>
-          作答方式
-          <select
-            aria-label="作答方式"
-            value={delivery}
-            disabled={busy}
-            onChange={(e) => setDelivery(e.target.value as typeof delivery)}
-          >
-            <option value="practice">逐题练习 · 提交后看解析</option>
-            <option value="exam">整卷自测 · 交卷后看答案</option>
-          </select>
-        </label>
-        <button
-          className="button primary"
-          disabled={busy || loading}
-          onClick={() => start("all")}
-        >
-          {attempt ? "开始新一轮" : "开始答题"}
-        </button>
-        {attempt?.status === "complete" && (
+      <details
+        className="exam-session-tools"
+        open={!attempt || toolsOpen}
+        onToggle={(e) => setToolsOpen(e.currentTarget.open)}
+      >
+        <summary>
+          练习记录与设置<span>切换记录 / 开始新一轮</span>
+        </summary>
+        <div className="exam-mode-picker">
+          <label>
+            作答方式
+            <select
+              aria-label="作答方式"
+              value={delivery}
+              disabled={busy}
+              onChange={(e) => setDelivery(e.target.value as typeof delivery)}
+            >
+              <option value="practice">逐题练习 · 提交后看解析</option>
+              <option value="exam">整卷自测 · 交卷后看答案</option>
+            </select>
+          </label>
           <button
-            className="button"
-            disabled={busy || !attempt.weak_points.length}
-            onClick={() => start("wrong")}
+            className={attempt ? "button" : "button primary"}
+            disabled={busy || loading}
+            onClick={() => start("all")}
           >
-            重练本轮错题
+            {attempt ? "开始新一轮" : "开始答题"}
           </button>
-        )}
-      </div>
-      {!!history.length && (
-        <label className="attempt-history">
-          练习记录
-          <select
-            aria-label="练习记录"
-            value={attempt?.id || ""}
-            disabled={busy}
-            onChange={(e) => {
-              const id = e.target.value;
-              void navigate(
-                () => void open(id).catch((err) => setError(errorText(err))),
-              );
-            }}
-          >
-            <option value="" disabled>
-              选择记录
-            </option>
-            {history.map((a) => (
-              <option value={a.id} key={a.id}>
-                {new Date(a.created_at).toLocaleString("zh-CN")} ·{" "}
-                {a.status === "complete"
-                  ? `${a.score} 分${a.self_assessed ? "（含自评）" : ""}`
-                  : a.status === "reviewing"
-                    ? `待自评 ${a.pending_review} 题`
-                    : `进行中 ${a.answered}/${a.total}`}{" "}
-                · {a.mode === "wrong" ? "错题" : "完整练习"} ·{" "}
-                {a.delivery === "exam" ? "整卷" : "逐题"}
-              </option>
-            ))}
-          </select>
-          {history.length < total && (
+          {attempt?.status === "complete" && (
             <button
               className="button"
-              disabled={busy}
-              onClick={async () => {
-                try {
-                  const p = await api<Page<AttemptBrief>>(
-                    `/learning/${row.id}/attempts?limit=100&offset=${history.length}`,
-                  );
-                  setHistory((v) => [
-                    ...new Map(
-                      [...v, ...p.items].map((a) => [a.id, a]),
-                    ).values(),
-                  ]);
-                } catch (e) {
-                  setError(errorText(e));
-                }
-              }}
+              disabled={busy || !attempt.weak_points.length}
+              onClick={() => start("wrong")}
             >
-              更多记录
+              重练本轮错题
             </button>
           )}
-        </label>
-      )}
+        </div>
+        {!!history.length && (
+          <label className="attempt-history">
+            练习记录
+            <select
+              aria-label="练习记录"
+              value={attempt?.id || ""}
+              disabled={busy}
+              onChange={(e) => {
+                const id = e.target.value;
+                void navigate(
+                  () => void open(id).catch((err) => setError(errorText(err))),
+                );
+              }}
+            >
+              <option value="" disabled>
+                选择记录
+              </option>
+              {history.map((a) => (
+                <option value={a.id} key={a.id}>
+                  {new Date(a.created_at).toLocaleString("zh-CN")} ·{" "}
+                  {a.status === "complete"
+                    ? `${a.score} 分${a.self_assessed ? "（含自评）" : ""}`
+                    : a.status === "reviewing"
+                      ? `待自评 ${a.pending_review} 题`
+                      : `进行中 ${a.answered}/${a.total}`}{" "}
+                  · {a.mode === "wrong" ? "错题" : "完整练习"} ·{" "}
+                  {a.delivery === "exam" ? "整卷" : "逐题"}
+                </option>
+              ))}
+            </select>
+            {history.length < total && (
+              <button
+                className="button"
+                disabled={busy}
+                onClick={async () => {
+                  try {
+                    const p = await api<Page<AttemptBrief>>(
+                      `/learning/${row.id}/attempts?limit=100&offset=${history.length}`,
+                    );
+                    setHistory((v) => [
+                      ...new Map(
+                        [...v, ...p.items].map((a) => [a.id, a]),
+                      ).values(),
+                    ]);
+                  } catch (e) {
+                    setError(errorText(e));
+                  }
+                }}
+              >
+                更多记录
+              </button>
+            )}
+          </label>
+        )}
+      </details>
       {loading ? (
         <p role="status">正在恢复练习…</p>
       ) : !attempt ? (
@@ -459,17 +492,24 @@ export function Quiz({
           <div className="mastery-strip">
             <strong>
               {attempt.status === "complete"
-                ? `练习成绩 ${attempt.score} / 100`
+                ? `练习成绩 ${attempt.earned_points ?? attempt.correct} / ${attempt.total_points ?? attempt.total} 分`
                 : attempt.status === "reviewing"
                   ? "已交卷，待完成自评"
-                  : `${attempt.delivery === "exam" ? "整卷自测" : "逐题练习"} · 已提交 ${attempt.answered}/${attempt.total}`}
+                  : `${attempt.delivery === "exam" ? "整卷自测" : "逐题练习"} · 已作答 ${attempt.total - unanswered}/${attempt.total}`}
             </strong>
-            <span>
-              {attempt.earned_points ?? attempt.correct} /{" "}
-              {attempt.total_points ?? attempt.total} 原始分
-              {attempt.self_assessed ? "（含自评）" : ""}
+            {attempt.status === "complete" && (
+              <span>
+                折合 {attempt.score} / 100
+                {attempt.self_assessed ? "（含自评）" : ""}
+              </span>
+            )}
+            <span role="status">
+              {saveState === "尚未保存，请重试" || saveState === "正在保存…"
+                ? saveState
+                : dirty
+                  ? "有待保存的作答"
+                  : saveState}
             </span>
-            <span role="status">{dirty ? "有待保存的作答" : saveState}</span>
           </div>
           {!!attempt.pending_review && (
             <p className="exam-notice">
@@ -477,320 +517,369 @@ export function Quiz({
               道题待按评分要点自评。完成后汇总成绩；自评分不代表教师或官方评分。
             </p>
           )}
-          <div className="exam-filters">
-            <label>
-              题目范围
-              <select
-                aria-label="题目范围"
-                value={filter}
-                disabled={busy}
-                onChange={(e) => {
-                  const f = e.target.value;
-                  void navigate(() => {
-                    setFilter(f);
-                    setIndex(0);
-                  });
-                }}
+          <div
+            className={`exam-reading-layout ${sheetOpen ? "sheet-open" : ""}`}
+          >
+            <aside className="exam-navigation" aria-label="题目导航">
+              <button
+                className="exam-sheet-toggle"
+                aria-expanded={sheetOpen}
+                onClick={() => setSheetOpen((v) => !v)}
               >
-                <option value="all">全部题目</option>
-                <option value="wrong">错题与未得满分题</option>
-                <option value="review">待自评</option>
-              </select>
-            </label>
-            {attempt.status === "complete" && (
-              <button className="button" onClick={exportReview}>
-                导出本轮复盘
+                答题卡{" "}
+                <span>
+                  {sheetOpen
+                    ? "收起"
+                    : `${attempt.total - unanswered} / ${attempt.total} 已作答`}
+                </span>
               </button>
-            )}
-          </div>
-          <nav className="exam-answer-sheet" aria-label="答题卡">
-            <span>答题卡</span>
-            <div>
-              {questions.map((item, i) => (
-                <button
-                  type="button"
-                  key={item.id}
-                  disabled={busy}
-                  aria-current={i === index ? "step" : undefined}
-                  aria-label={`第${attempt.items.findIndex((x) => x.id === item.id) + 1}题${item.grading === "self_pending" ? "，待自评" : item.submitted ? (item.correct ? "，已掌握" : "，待巩固") : filled(item.id === q?.id ? draft : draftOf(item)) ? "，已作答" : "，未作答"}`}
-                  className={`${i === index ? "current " : ""}${item.grading === "self_pending" ? "review" : item.submitted ? (item.correct ? "correct" : "incorrect") : filled(item.id === q?.id ? draft : draftOf(item)) ? "draft" : ""}`}
-                  onClick={() => void navigate(() => setIndex(i))}
-                >
-                  {attempt.items.findIndex((x) => x.id === item.id) + 1}
-                </button>
-              ))}
-            </div>
-            <small>
-              描边：当前题 · 浅绿：已作答 · 深绿：已掌握 · 赭色：待巩固 ·
-              虚线：待自评
-            </small>
-          </nav>
-          {q ? (
-            <section className="quiz-question exam-question" key={q.id}>
-              <div className="exam-question-meta">
-                <strong>
-                  第 {attempt.items.findIndex((item) => item.id === q.id) + 1}{" "}
-                  题
-                </strong>
-                <span>{questionTypes[typeOf(q)].label}</span>
-                <span>{q.points || 1} 分</span>
-                {q.point && <span>{q.point}</span>}
-              </div>
-              <MarkdownRenderer content={q.question} />
-              {!objectiveTypes.includes(typeOf(q)) ? (
-                <label className="exam-written-answer">
-                  我的作答
-                  <textarea
-                    aria-label="我的作答"
-                    value={draft.text || ""}
-                    maxLength={12000}
-                    rows={typeOf(q) === "fill_blank" ? 3 : 8}
-                    disabled={q.submitted || submitting}
-                    onChange={(e) => updateDraft({ text: e.target.value })}
-                    placeholder={
-                      typeOf(q) === "fill_blank"
-                        ? "按（1）（2）顺序填写各空答案，注意单位与精度"
-                        : "分点写出答案；计算与证明题请保留步骤。支持输入 LaTeX 公式。"
-                    }
-                  />
-                  <small>{(draft.text || "").length} / 12000</small>
-                </label>
-              ) : (
-                <fieldset
-                  className="quiz-options exam-options"
-                  disabled={busy || q.submitted}
-                >
-                  <legend>
-                    {typeOf(q) === "multiple"
-                      ? "可选多项；全部选对得分，少选、多选、错选不得分"
-                      : typeOf(q) === "true_false"
-                        ? "判断命题是否成立"
-                        : "请选择一个最符合题意的选项"}
-                  </legend>
-                  {q.options.map((option, i) => {
-                    const chosen =
-                      typeOf(q) === "multiple"
-                        ? (draft.selected_indices || []).includes(i)
-                        : draft.selected === i;
-                    const correct = (
-                      q.correct_indices || [q.correct_index]
-                    ).includes(i);
-                    return (
-                      <label
-                        key={i}
-                        className={`${chosen ? "selected " : ""}${q.submitted && correct ? "correct " : ""}${q.submitted && chosen && !correct ? "incorrect" : ""}`}
-                      >
-                        <input
-                          type={typeOf(q) === "multiple" ? "checkbox" : "radio"}
-                          name={`${attempt.id}-${q.id}`}
-                          checked={chosen}
-                          onChange={() =>
-                            updateDraft(
-                              typeOf(q) === "multiple"
-                                ? {
-                                    selected_indices: chosen
-                                      ? (draft.selected_indices || []).filter(
-                                          (v) => v !== i,
-                                        )
-                                      : [
-                                          ...(draft.selected_indices || []),
-                                          i,
-                                        ].sort(),
-                                  }
-                                : { selected: i },
-                            )
-                          }
-                        />
-                        <span>
-                          {typeOf(q) === "true_false"
-                            ? i === 0
-                              ? "√"
-                              : "×"
-                            : String.fromCharCode(65 + i) + "."}
-                        </span>
-                        <MarkdownRenderer content={option} />
-                      </label>
-                    );
-                  })}
-                </fieldset>
-              )}
-              {!q.submitted ? (
-                <div className="learning-toolbar">
-                  <button
-                    className="button"
-                    disabled={busy || !dirty}
-                    onClick={() => void persist()}
-                  >
-                    保存作答
-                  </button>
-                  {attempt.delivery !== "exam" && (
-                    <button
-                      className="button primary"
-                      disabled={busy || !filled(draft)}
-                      onClick={() => void persist(true)}
+              <div className="exam-navigation-content">
+                <div className="exam-filters">
+                  <label>
+                    题目范围
+                    <select
+                      aria-label="题目范围"
+                      value={filter}
+                      disabled={busy}
+                      onChange={(e) => {
+                        const f = e.target.value;
+                        void navigate(() => {
+                          setFilter(f);
+                          setIndex(0);
+                        });
+                      }}
                     >
-                      提交本题，查看解析
+                      <option value="all">全部题目</option>
+                      <option value="wrong">错题与未得满分题</option>
+                      <option value="review">待自评</option>
+                    </select>
+                  </label>
+                  {attempt.status === "complete" && (
+                    <button className="button" onClick={exportReview}>
+                      导出本轮复盘
                     </button>
                   )}
-                  {attempt.delivery === "exam" && (
-                    <span className="muted">
-                      交卷前可修改，答案与解析暂不显示。
-                    </span>
-                  )}
                 </div>
-              ) : (
-                <div className="exam-feedback">
-                  <h4>
-                    {q.grading === "self_pending"
-                      ? "参考答案与评分要点"
-                      : q.grading === "unanswered"
-                        ? "本题未作答 · 0 分"
-                        : `${q.correct ? "本题已掌握" : "本题待巩固"} · ${q.earned ?? (q.correct ? 1 : 0)} / ${q.points || 1} 分${q.grading === "self_assessed" ? "（自评）" : ""}`}
-                  </h4>
-                  {objectiveTypes.includes(typeOf(q)) ? (
-                    <p>
-                      <strong>正确答案：</strong>
-                      {(q.correct_indices || [q.correct_index!])
-                        .map((i) =>
-                          typeOf(q) === "true_false"
-                            ? q.options[i]
-                            : String.fromCharCode(65 + i),
-                        )
-                        .join("、")}
-                    </p>
+                <nav className="exam-answer-sheet" aria-label="答题卡">
+                  <span>答题卡</span>
+                  <div>
+                    {questions.map((item, i) => (
+                      <button
+                        type="button"
+                        key={item.id}
+                        disabled={busy}
+                        aria-current={i === index ? "step" : undefined}
+                        aria-label={`第${attempt.items.findIndex((x) => x.id === item.id) + 1}题${item.grading === "self_pending" ? "，待自评" : item.submitted ? (item.correct ? "，已掌握" : "，待巩固") : filled(item.id === q?.id ? draft : draftOf(item)) ? "，已作答" : "，未作答"}`}
+                        className={`${i === index ? "current " : ""}${item.grading === "self_pending" ? "review" : item.submitted ? (item.correct ? "correct" : "incorrect") : filled(item.id === q?.id ? draft : draftOf(item)) ? "draft" : ""}`}
+                        onClick={() => void navigate(() => setIndex(i))}
+                      >
+                        {attempt.items.findIndex((x) => x.id === item.id) + 1}
+                      </button>
+                    ))}
+                  </div>
+                  <small>
+                    描边：当前题 · 浅绿：已作答 · 深绿：已掌握 · 赭色：待巩固 ·
+                    虚线：待自评
+                  </small>
+                </nav>
+              </div>
+            </aside>
+            <div className="exam-paper-column">
+              {q ? (
+                <section
+                  ref={questionRef}
+                  tabIndex={-1}
+                  aria-label={`第${attempt.items.findIndex((item) => item.id === q.id) + 1}题内容`}
+                  className="quiz-question exam-question"
+                  key={q.id}
+                >
+                  <div className="exam-question-meta">
+                    <strong>
+                      第{" "}
+                      {attempt.items.findIndex((item) => item.id === q.id) + 1}{" "}
+                      题
+                    </strong>
+                    <span>{questionTypes[typeOf(q)].label}</span>
+                    <span>{q.points || 1} 分</span>
+                    {q.point && <span>{q.point}</span>}
+                  </div>
+                  <MarkdownRenderer content={q.question} />
+                  {!objectiveTypes.includes(typeOf(q)) ? (
+                    <label className="exam-written-answer">
+                      我的作答
+                      <textarea
+                        aria-label="我的作答"
+                        value={draft.text || ""}
+                        maxLength={12000}
+                        rows={typeOf(q) === "fill_blank" ? 3 : 8}
+                        disabled={q.submitted || submitting}
+                        onChange={(e) => updateDraft({ text: e.target.value })}
+                        placeholder={
+                          typeOf(q) === "fill_blank"
+                            ? "按（1）（2）顺序填写各空答案，注意单位与精度"
+                            : "分点写出答案；计算与证明题请保留步骤。支持输入 LaTeX 公式。"
+                        }
+                      />
+                      <small>{(draft.text || "").length} / 12000</small>
+                    </label>
                   ) : (
-                    <MarkdownRenderer content={q.answer || ""} />
-                  )}
-                  <h4>解析</h4>
-                  <MarkdownRenderer content={q.explanation || ""} />
-                  {!!q.rubric?.length && (
                     <fieldset
-                      className="exam-rubric"
-                      disabled={busy || q.grading !== "self_pending"}
+                      className="quiz-options exam-options"
+                      disabled={busy || q.submitted}
                     >
                       <legend>
-                        按评分要点自评 · 等价表述与合理替代解法可得分
+                        {typeOf(q) === "multiple"
+                          ? "可选多项；全部选对得分，少选、多选、错选不得分"
+                          : typeOf(q) === "true_false"
+                            ? "判断命题是否成立"
+                            : "请选择一个最符合题意的选项"}
                       </legend>
-                      {q.rubric.map((r, i) => (
-                        <label key={r.id}>
-                          <span>
-                            {i + 1}. {r.text}
-                            <small>满分 {r.points} 分</small>
-                          </span>
-                          <select
-                            aria-label={`要点${i + 1}得分`}
-                            value={
-                              rubric[r.id] ?? q.rubric_scores?.[r.id] ?? ""
-                            }
-                            onChange={(e) =>
-                              setRubric((v) => ({
-                                ...v,
-                                [r.id]: Number(e.target.value),
-                              }))
-                            }
+                      {q.options.map((option, i) => {
+                        const chosen =
+                          typeOf(q) === "multiple"
+                            ? (draft.selected_indices || []).includes(i)
+                            : draft.selected === i;
+                        const correct = (
+                          q.correct_indices || [q.correct_index]
+                        ).includes(i);
+                        return (
+                          <label
+                            key={i}
+                            className={`${chosen ? "selected " : ""}${q.submitted && correct ? "correct " : ""}${q.submitted && chosen && !correct ? "incorrect" : ""}`}
                           >
-                            <option value="" disabled>
-                              请选择
-                            </option>
-                            {Array.from({ length: r.points + 1 }, (_, i) => (
-                              <option key={i} value={i}>
-                                {i} 分
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                      ))}
+                            <input
+                              type={
+                                typeOf(q) === "multiple" ? "checkbox" : "radio"
+                              }
+                              name={`${attempt.id}-${q.id}`}
+                              checked={chosen}
+                              onChange={() =>
+                                updateDraft(
+                                  typeOf(q) === "multiple"
+                                    ? {
+                                        selected_indices: chosen
+                                          ? (
+                                              draft.selected_indices || []
+                                            ).filter((v) => v !== i)
+                                          : [
+                                              ...(draft.selected_indices || []),
+                                              i,
+                                            ].sort(),
+                                      }
+                                    : { selected: i },
+                                )
+                              }
+                            />
+                            <span>
+                              {typeOf(q) === "true_false"
+                                ? i === 0
+                                  ? "√"
+                                  : "×"
+                                : String.fromCharCode(65 + i) + "."}
+                            </span>
+                            <MarkdownRenderer content={option} />
+                          </label>
+                        );
+                      })}
                     </fieldset>
                   )}
-                  {q.grading === "self_pending" && (
-                    <>
-                      <p className="muted">
-                        结合自己的原始作答逐项给分，不能因看过答案就给分。确认后保留该次自评记录。
+                  {!q.submitted ? (
+                    <div className="learning-toolbar">
+                      <button
+                        className="button"
+                        disabled={busy || !dirty}
+                        onClick={() => void persist()}
+                      >
+                        保存作答
+                      </button>
+                      {attempt.delivery !== "exam" && (
+                        <button
+                          className="button primary"
+                          disabled={busy || !filled(draft)}
+                          onClick={() => void persist(true)}
+                        >
+                          提交本题，查看解析
+                        </button>
+                      )}
+                      {attempt.delivery === "exam" && (
+                        <span className="muted">
+                          交卷前可修改，答案与解析暂不显示。
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="exam-feedback">
+                      <h4>
+                        {q.grading === "self_pending"
+                          ? "参考答案与评分要点"
+                          : q.grading === "unanswered"
+                            ? "本题未作答 · 0 分"
+                            : `${q.correct ? "本题已掌握" : "本题待巩固"} · ${q.earned ?? (q.correct ? 1 : 0)} / ${q.points || 1} 分${q.grading === "self_assessed" ? "（自评）" : ""}`}
+                      </h4>
+                      {objectiveTypes.includes(typeOf(q)) ? (
+                        <p>
+                          <strong>正确答案：</strong>
+                          {(q.correct_indices || [q.correct_index!])
+                            .map((i) =>
+                              typeOf(q) === "true_false"
+                                ? q.options[i]
+                                : String.fromCharCode(65 + i),
+                            )
+                            .join("、")}
+                        </p>
+                      ) : (
+                        <MarkdownRenderer content={q.answer || ""} />
+                      )}
+                      <h4>解析</h4>
+                      <MarkdownRenderer content={q.explanation || ""} />
+                      {!!q.rubric?.length && (
+                        <fieldset
+                          className="exam-rubric"
+                          disabled={busy || q.grading !== "self_pending"}
+                        >
+                          <legend>
+                            按评分要点自评 · 等价表述与合理替代解法可得分
+                          </legend>
+                          {q.rubric.map((r, i) => (
+                            <label key={r.id}>
+                              <span>
+                                {i + 1}. {r.text}
+                                <small>满分 {r.points} 分</small>
+                              </span>
+                              <select
+                                aria-label={`要点${i + 1}得分`}
+                                value={
+                                  rubric[r.id] ?? q.rubric_scores?.[r.id] ?? ""
+                                }
+                                onChange={(e) =>
+                                  setRubric((v) => ({
+                                    ...v,
+                                    [r.id]: Number(e.target.value),
+                                  }))
+                                }
+                              >
+                                <option value="" disabled>
+                                  请选择
+                                </option>
+                                {Array.from(
+                                  { length: r.points + 1 },
+                                  (_, i) => (
+                                    <option key={i} value={i}>
+                                      {i} 分
+                                    </option>
+                                  ),
+                                )}
+                              </select>
+                            </label>
+                          ))}
+                        </fieldset>
+                      )}
+                      {q.grading === "self_pending" && (
+                        <>
+                          <p className="muted">
+                            结合自己的原始作答逐项给分，不能因看过答案就给分。确认后保留该次自评记录。
+                          </p>
+                          <button
+                            className="button primary"
+                            disabled={
+                              busy ||
+                              !q.rubric?.every(
+                                (r) => rubric[r.id] !== undefined,
+                              )
+                            }
+                            onClick={() => void assess()}
+                          >
+                            确认本题自评
+                          </button>
+                        </>
+                      )}
+                      <ReferenceList
+                        citations={attempt.citations}
+                        content={(q.refs || []).map((n) => `[${n}]`).join("")}
+                        onCitation={onCitation}
+                      />
+                    </div>
+                  )}
+                </section>
+              ) : (
+                <p className="exam-notice">
+                  当前范围没有题目，可切换回“全部题目”。
+                </p>
+              )}
+              <div className="learning-toolbar spread exam-page-controls">
+                <button
+                  className="button"
+                  disabled={busy || index <= 0}
+                  onClick={() => void navigate(() => setIndex((i) => i - 1))}
+                >
+                  上一题
+                </button>
+                <button
+                  className="exam-mobile-map button"
+                  aria-expanded={sheetOpen}
+                  onClick={() => {
+                    setSheetOpen((v) => !v);
+                    if (!sheetOpen)
+                      questionRef.current
+                        ?.closest(".exam-reading-layout")
+                        ?.scrollIntoView({ block: "start" });
+                  }}
+                >
+                  答题卡 · {questions.length ? index + 1 : 0}/{questions.length}
+                </button>
+                <span className="exam-desktop-count">
+                  {questions.length ? index + 1 : 0} / {questions.length}
+                </span>
+                <button
+                  className="button"
+                  disabled={busy || index >= questions.length - 1}
+                  onClick={() => void navigate(() => setIndex((i) => i + 1))}
+                >
+                  下一题
+                </button>
+              </div>
+              {attempt.status === "active" && (
+                <div className="exam-submit">
+                  {confirmFinish ? (
+                    <div role="alert">
+                      <strong>
+                        {unanswered
+                          ? `还有 ${unanswered} 题未作答，交卷后这些题计 0 分。`
+                          : "已填写的作答将一并提交。"}
+                      </strong>
+                      <p>
+                        交卷后答案锁定，显示解析；非选择题需继续按评分要点自评。
                       </p>
                       <button
                         className="button primary"
-                        disabled={
-                          busy ||
-                          !q.rubric?.every((r) => rubric[r.id] !== undefined)
-                        }
-                        onClick={() => void assess()}
+                        disabled={busy}
+                        onClick={() => void finish()}
                       >
-                        确认本题自评
+                        确认交卷
                       </button>
-                    </>
+                      <button
+                        className="button"
+                        disabled={busy}
+                        onClick={() => setConfirmFinish(false)}
+                      >
+                        返回检查
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      className="button primary"
+                      disabled={busy}
+                      onClick={() => setConfirmFinish(true)}
+                    >
+                      {attempt.delivery === "exam"
+                        ? "交卷并查看解析"
+                        : "结束本轮，汇总作答"}
+                    </button>
                   )}
-                  <ReferenceList
-                    citations={attempt.citations}
-                    content={(q.refs || []).map((n) => `[${n}]`).join("")}
-                    onCitation={onCitation}
-                  />
                 </div>
-              )}
-            </section>
-          ) : (
-            <p className="exam-notice">
-              当前范围没有题目，可切换回“全部题目”。
-            </p>
-          )}
-          <div className="learning-toolbar spread">
-            <button
-              className="button"
-              disabled={busy || index <= 0}
-              onClick={() => void navigate(() => setIndex((i) => i - 1))}
-            >
-              上一题
-            </button>
-            <span>
-              {questions.length ? index + 1 : 0} / {questions.length}
-            </span>
-            <button
-              className="button"
-              disabled={busy || index >= questions.length - 1}
-              onClick={() => void navigate(() => setIndex((i) => i + 1))}
-            >
-              下一题
-            </button>
-          </div>
-          {attempt.status === "active" && (
-            <div className="exam-submit">
-              {confirmFinish ? (
-                <div role="alert">
-                  <strong>
-                    {unanswered
-                      ? `还有 ${unanswered} 题未作答，交卷后这些题计 0 分。`
-                      : "已填写的作答将一并提交。"}
-                  </strong>
-                  <p>
-                    交卷后答案锁定，显示解析；非选择题需继续按评分要点自评。
-                  </p>
-                  <button
-                    className="button primary"
-                    disabled={busy}
-                    onClick={() => void finish()}
-                  >
-                    确认交卷
-                  </button>
-                  <button
-                    className="button"
-                    disabled={busy}
-                    onClick={() => setConfirmFinish(false)}
-                  >
-                    返回检查
-                  </button>
-                </div>
-              ) : (
-                <button
-                  className="button primary"
-                  disabled={busy}
-                  onClick={() => setConfirmFinish(true)}
-                >
-                  {attempt.delivery === "exam"
-                    ? "交卷并查看解析"
-                    : "结束本轮，汇总作答"}
-                </button>
               )}
             </div>
-          )}
+          </div>
           {!!attempt.weak_points.length && attempt.status !== "active" && (
             <div className="weak-points">
               <h3>下一轮重点复习</h3>

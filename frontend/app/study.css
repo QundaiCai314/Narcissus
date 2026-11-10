@@ -1,0 +1,618 @@
+/* Reading and practice share the existing paper, ink and moss palette. */
+.workspace-dialog.study-dialog {
+  inset: 0;
+  margin: 0;
+  width: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.study-dialog .studio-detail-heading {
+  padding: 12px 32px;
+  background: var(--bg);
+  flex: none;
+}
+.study-dialog .studio-detail-heading .button {
+  font-size: 14px;
+  min-height: 44px;
+}
+.study-dialog .learning-area {
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+.study-dialog .writing-heading {
+  padding: 16px 32px;
+  gap: 16px;
+  flex: none;
+}
+.study-dialog .writing-heading .eyebrow {
+  display: none;
+}
+.study-dialog .writing-heading h2 {
+  font: 24px/32px var(--serif);
+  margin: 0;
+}
+.study-dialog .button {
+  min-height: 44px;
+  font-size: 14px;
+  padding: 8px 16px;
+}
+.study-dialog button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.study-dialog [hidden] {
+  display: none !important;
+}
+.study-dialog summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding: 12px 0;
+  font-size: 14px;
+  color: var(--green);
+}
+.study-dialog summary::marker {
+  color: var(--muted);
+}
+.study-dialog summary:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+.study-dialog details > summary span {
+  color: var(--muted);
+  margin-left: 16px;
+  font-size: 12px;
+}
+.learning-collection {
+  margin: 0 32px;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+  max-height: 35dvh;
+  overflow: auto;
+}
+.learning-collection .learning-library {
+  padding: 8px 0 16px;
+  border: 0;
+}
+.study-dialog .learning-scroll {
+  padding: 24px 32px;
+  scroll-padding: 16px;
+  overscroll-behavior: contain;
+}
+.quiz-planning .learning-scroll {
+  background: var(--bg);
+}
+.quiz-steps {
+  display: flex;
+  gap: 24px;
+  padding: 0 32px;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+.quiz-steps button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 0;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  font-size: 14px;
+}
+.quiz-steps button span {
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+.quiz-steps button[aria-current="step"] {
+  color: var(--green);
+  border-color: var(--green);
+  font-weight: 600;
+}
+.quiz-steps button:disabled {
+  opacity: 1;
+  cursor: default;
+}
+.study-dialog .learning-form {
+  max-width: 880px;
+  margin: 0 auto;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.quiz-step-title {
+  margin: 0;
+  color: var(--ink);
+  font: 30px/36px var(--serif);
+  text-wrap: balance;
+}
+.quiz-step-title:focus {
+  outline: none;
+}
+.study-dialog .learning-form > p {
+  margin: 0;
+}
+.study-dialog .learning-form .muted {
+  font-size: 14px;
+  line-height: 1.7;
+}
+.study-dialog .learning-form label {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: var(--ink-secondary);
+}
+.study-dialog .learning-form input:not([type="checkbox"]),
+.study-dialog .learning-form select,
+.study-dialog .learning-form textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 12px;
+  font-size: 16px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.study-dialog .learning-form textarea {
+  min-height: 96px;
+}
+.study-dialog .learning-form fieldset {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  border-radius: 8px;
+  margin: 16px 0;
+}
+.study-dialog .learning-form legend {
+  font-size: 14px;
+  color: var(--green);
+  padding: 0 8px;
+}
+.study-dialog .learning-form .source-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  margin: 0;
+  min-height: 48px;
+  overflow-wrap: anywhere;
+}
+.study-dialog .source-option input {
+  accent-color: var(--green);
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+.study-dialog .exam-settings {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+.study-dialog .learning-form-grid {
+  gap: 24px;
+}
+.study-dialog .learning-presets {
+  gap: 8px;
+}
+.study-dialog .preset-chip {
+  min-height: 40px;
+  padding: 8px 12px;
+  font-size: 14px;
+}
+.study-dialog .exam-type-grid {
+  gap: 8px;
+  margin: 16px 0;
+}
+.study-dialog .exam-type-grid .source-option:has(input:checked) {
+  background: var(--green-light);
+  border-color: var(--green);
+}
+.study-dialog .exam-presets {
+  gap: 8px;
+}
+.study-dialog .exam-plan {
+  padding: 16px;
+  margin: 16px 0;
+  font-size: 14px;
+}
+.quiz-optional {
+  margin: 0 0 16px;
+  border-bottom: 1px solid var(--line);
+}
+.quiz-plan-review {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 24px;
+}
+.quiz-plan-summary {
+  display: grid;
+  gap: 8px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+.quiz-plan-summary strong {
+  font: 24px/32px var(--serif);
+}
+.quiz-plan-summary span {
+  font-size: 14px;
+  color: var(--ink-secondary);
+}
+.quiz-plan-review dl {
+  display: grid;
+  gap: 16px;
+  margin: 24px 0;
+}
+.quiz-plan-review dl > div {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr);
+  gap: 16px;
+  font-size: 14px;
+}
+.quiz-plan-review dt {
+  color: var(--muted);
+}
+.quiz-plan-review dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.quiz-plan-review table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.quiz-plan-review caption {
+  text-align: left;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.quiz-plan-review th,
+.quiz-plan-review td {
+  padding: 12px 8px;
+  text-align: right;
+  border-bottom: 1px solid var(--line);
+}
+.quiz-plan-review tr > :first-child {
+  text-align: left;
+}
+.quiz-plan-review tbody th {
+  font-weight: 400;
+}
+.quiz-plan-review tfoot {
+  color: var(--green);
+  background: var(--green-light);
+}
+.quiz-plan-review > p {
+  margin: 24px 0 0;
+}
+.quiz-wizard-footer {
+  position: sticky;
+  bottom: -24px;
+  z-index: 3;
+  margin-top: auto;
+  padding: 16px 0;
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.quiz-wizard-summary {
+  margin-right: auto;
+  font-size: 14px;
+  color: var(--ink-secondary);
+}
+.quiz-paper-details,
+.exam-session-tools {
+  border-bottom: 1px solid var(--line);
+}
+.quiz-paper-details > summary {
+  overflow-wrap: anywhere;
+}
+.quiz-paper-details:not([open]) > summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.quiz-paper-details > .learning-result-heading {
+  padding: 16px 0;
+}
+.exam-session-tools {
+  margin-bottom: 8px;
+}
+.exam-session-tools .exam-mode-picker {
+  padding: 16px 0;
+}
+.exam-session-tools .attempt-history {
+  margin: 0 0 24px;
+}
+.study-dialog .exam-workspace {
+  gap: 16px;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+.study-dialog .mastery-strip {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--green-light);
+  border-radius: 4px;
+  padding: 12px 16px;
+  margin: 0;
+  font-size: 14px;
+  gap: 8px 24px;
+}
+.study-dialog .mastery-strip > strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.study-dialog .mastery-strip > span:last-child {
+  margin-left: auto;
+}
+.exam-reading-layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+.exam-navigation {
+  position: sticky;
+  top: 80px;
+  min-width: 0;
+}
+.exam-navigation-content {
+  display: grid;
+  gap: 16px;
+}
+.exam-navigation .exam-filters {
+  padding: 0;
+}
+.exam-navigation .exam-filters select {
+  min-height: 44px;
+  max-width: 100%;
+  font-size: 14px;
+}
+.study-dialog .exam-answer-sheet {
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+.study-dialog .exam-answer-sheet button {
+  min-width: 44px;
+  min-height: 44px;
+  font-variant-numeric: tabular-nums;
+}
+.study-dialog .exam-answer-sheet small {
+  font-size: 12px;
+}
+.exam-sheet-toggle,
+.exam-mobile-map {
+  display: none;
+}
+.exam-paper-column {
+  min-width: 0;
+}
+.study-dialog .exam-question {
+  padding: 32px;
+  border-radius: 8px;
+  scroll-margin-top: 80px;
+}
+.study-dialog .exam-question:focus {
+  outline: none;
+}
+.study-dialog .exam-question > .markdown-body {
+  font-size: 18px;
+  line-height: 1.7;
+  max-width: 680px;
+}
+.study-dialog .exam-options .markdown-body,
+.study-dialog .exam-feedback > .markdown-body {
+  font-size: 16px;
+  line-height: 1.7;
+}
+.study-dialog .exam-question-meta {
+  font-size: 14px;
+  gap: 8px 16px;
+  margin-bottom: 24px;
+}
+.study-dialog .exam-written-answer textarea {
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 16px;
+}
+.study-dialog .exam-page-controls {
+  position: sticky;
+  bottom: -24px;
+  background: var(--paper);
+  border-top: 1px solid var(--line);
+  padding: 16px 0;
+  margin: 16px 0 0;
+  z-index: 2;
+}
+.study-dialog .exam-submit {
+  margin: 24px 0 0;
+  padding: 16px;
+}
+.study-dialog .exam-notice {
+  margin: 0;
+  padding: 16px;
+  font-size: 14px;
+}
+.study-dialog .exam-rubric select {
+  min-height: 44px;
+  font-size: 16px;
+}
+.study-dialog .exam-question .katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+@media (max-width: 960px) {
+  .exam-reading-layout {
+    grid-template-columns: 192px minmax(0, 1fr);
+    gap: 16px;
+  }
+  .study-dialog .exam-question {
+    padding: 24px;
+  }
+}
+@media (max-width: 680px) {
+  .study-dialog .studio-detail-heading {
+    padding: 4px 16px;
+  }
+  .study-dialog .studio-detail-heading > span {
+    font-size: 12px;
+  }
+  .study-dialog .writing-heading {
+    padding: 8px 16px;
+    gap: 8px;
+  }
+  .study-dialog .writing-heading h2 {
+    font-size: 20px;
+    line-height: 28px;
+  }
+  .study-dialog .writing-heading .button {
+    font-size: 12px;
+    padding: 8px;
+  }
+  .learning-collection {
+    margin: 0 16px;
+  }
+  .study-dialog summary {
+    padding: 8px 0;
+  }
+  .study-dialog .learning-scroll {
+    padding: 16px;
+  }
+  .quiz-steps {
+    padding: 0 16px;
+    gap: 16px;
+    justify-content: space-between;
+  }
+  .quiz-steps button {
+    padding: 12px 0;
+    gap: 4px;
+    font-size: 12px;
+  }
+  .quiz-step-title {
+    font-size: 24px;
+    line-height: 32px;
+  }
+  .study-dialog .learning-form-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .study-dialog .learning-form fieldset {
+    padding: 12px;
+  }
+  .study-dialog .learning-form .source-option {
+    padding: 12px 8px;
+  }
+  .study-dialog .exam-type-grid {
+    grid-template-columns: 1fr;
+  }
+  .quiz-plan-review {
+    padding: 16px;
+  }
+  .quiz-plan-review dl > div {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .quiz-plan-review th,
+  .quiz-plan-review td {
+    padding: 12px 4px;
+  }
+  .quiz-wizard-footer {
+    bottom: -16px;
+    padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
+    gap: 8px;
+  }
+  .quiz-wizard-summary {
+    flex-basis: 100%;
+    font-size: 12px;
+  }
+  .quiz-wizard-footer .primary {
+    flex: 1;
+  }
+  .quiz-paper-details > summary {
+    font-size: 12px;
+  }
+  .quiz-paper-details > summary span,
+  .exam-session-tools summary span {
+    display: none;
+  }
+  .study-dialog .exam-workspace {
+    gap: 12px;
+  }
+  .study-dialog .mastery-strip {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+  .study-dialog .mastery-strip > span:last-child {
+    margin-left: 0;
+  }
+  .exam-reading-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .exam-navigation {
+    position: static;
+    width: 100%;
+  }
+  .exam-navigation-content {
+    display: none;
+    padding: 16px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+  }
+  .sheet-open .exam-navigation-content {
+    display: grid;
+  }
+  .exam-sheet-toggle {
+    display: flex;
+    width: 100%;
+    min-height: 44px;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--green);
+    font-size: 14px;
+  }
+  .exam-sheet-toggle span {
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .exam-paper-column {
+    width: 100%;
+  }
+  .study-dialog .exam-question {
+    padding: 16px;
+  }
+  .study-dialog .exam-question-meta {
+    margin-bottom: 16px;
+    font-size: 12px;
+  }
+  .study-dialog .exam-question > .markdown-body {
+    font-size: 16px;
+  }
+  .study-dialog .exam-options label {
+    padding: 12px 8px;
+  }
+  .study-dialog .exam-page-controls {
+    bottom: -16px;
+    padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
+    gap: 8px;
+  }
+  .study-dialog .exam-page-controls .button {
+    padding: 8px 12px;
+  }
+  .exam-mobile-map {
+    display: inline-flex;
+  }
+  .exam-desktop-count {
+    display: none;
+  }
+}
