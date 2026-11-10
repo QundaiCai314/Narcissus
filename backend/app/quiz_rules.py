@@ -115,7 +115,7 @@ def response_value(q, data, allow_empty=True):
 def has_answer(q, response):
     if kind(q) in {"single", "true_false"}: return response.get("selected") is not None
     if kind(q) == "multiple": return bool(response.get("selected_indices"))
-    return bool(response.get("text", "").strip())
+    return bool(response.get("text", "").strip() or response.get("images"))
 
 
 def grade(q, response):

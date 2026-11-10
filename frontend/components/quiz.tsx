@@ -12,6 +12,7 @@ import {
 } from "@/lib/learning";
 import { ReferenceList } from "./writing-view";
 import { MarkdownRenderer } from "./markdown-renderer";
+import { AnswerEditor } from "./answer-editor";
 
 type Draft = {
   selected?: number | null;
@@ -25,8 +26,11 @@ const draftOf = (q: QuizQuestion): Draft =>
     : objectiveTypes.includes(typeOf(q))
       ? { selected: q.selected ?? null }
       : { text: q.text || "" };
-const filled = (d: Draft) =>
-  d.selected != null || !!d.selected_indices?.length || !!d.text?.trim();
+const filled = (d: Draft, images: QuizQuestion["images"] = []) =>
+  d.selected != null ||
+  !!d.selected_indices?.length ||
+  !!d.text?.trim() ||
+  !!images.length;
 const same = (a: Draft, b: Draft) => {
   // The API trims written answers; trailing newlines must not trigger endless saves.
   const normalized = (value: Draft) =>
@@ -56,6 +60,8 @@ export function Quiz({
     [busy, setBusy] = useState(false),
     [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [imageBusy, setImageBusy] = useState(false);
+  const [imagePending, setImagePending] = useState(false);
   const [saveState, setSaveState] = useState(""),
     [filter, setFilter] = useState("all"),
     [confirmFinish, setConfirmFinish] = useState(false);
@@ -84,11 +90,11 @@ export function Quiz({
   const q = questions[index];
   const dirty = !!q && !q.submitted && !same(draft, draftOf(q));
   const dirtyRef = useRef(dirty);
-  dirtyRef.current = dirty;
+  dirtyRef.current = dirty || imageBusy || imagePending;
   useEffect(() => {
-    onDirtyChange?.(dirty);
+    onDirtyChange?.(dirty || imageBusy || imagePending);
     return () => onDirtyChange?.(false);
-  }, [dirty, onDirtyChange]);
+  }, [dirty, imageBusy, imagePending, onDirtyChange]);
   const setValue = useCallback((value: QuizAttempt) => {
     current.current = value;
     setAttempt(value);
@@ -164,6 +170,10 @@ export function Quiz({
     }
   }
   async function persist(submit = false): Promise<QuizAttempt | null> {
+    if (submit && imagePending) {
+      setError("请先完成或取消待上传的图片，再提交作答。");
+      return null;
+    }
     const value = current.current;
     if (!value || !q || locked.current) return null;
     if (!dirty && !submit) return value;
@@ -208,13 +218,65 @@ export function Quiz({
     setDraft(value);
     setSaveState("待保存");
   }
+  async function changeImage(
+    file?: File,
+    requestKey?: string,
+    imageId?: string,
+  ): Promise<boolean> {
+    if (!q || locked.current) return false;
+    if (dirty && !(await persist())) return false;
+    const value = current.current;
+    if (!value) return false;
+    locked.current = true;
+    setBusy(true);
+    setImageBusy(true);
+    setSaveState(file ? "正在上传图片…" : "正在删除图片…");
+    try {
+      const form = new FormData();
+      if (file) {
+        form.append("file", file);
+        form.append("revision", String(value.revision));
+        form.append("request_key", requestKey!);
+      }
+      const result = await api<QuizAttempt>(
+        `/quiz-attempts/${value.id}/answers/${q.id}/images${imageId ? `/${imageId}` : ""}`,
+        {
+          method: file ? "POST" : "DELETE",
+          body: file ? form : JSON.stringify({ revision: value.revision }),
+        },
+      );
+      if (!alive.current) return false;
+      setValue(result);
+      setError("");
+      setSaveState(file ? "图片已保存" : "图片已删除");
+      return true;
+    } catch (e) {
+      setError(errorText(e));
+      setSaveState("图片操作未完成，请重试");
+      return false;
+    } finally {
+      locked.current = false;
+      if (alive.current) {
+        setBusy(false);
+        setImageBusy(false);
+      }
+    }
+  }
   async function navigate(next: () => void) {
+    if (imagePending) {
+      setError("请先完成或取消待上传的图片，再切换题目。");
+      return;
+    }
     if (locked.current) return;
     if (dirty && !(await persist())) return;
     next();
     setConfirmFinish(false);
   }
   async function start(mode: "all" | "wrong") {
+    if (imagePending) {
+      setError("请先完成或取消待上传的图片。");
+      return;
+    }
     if (locked.current) return;
     if (dirty && !(await persist())) return;
     if (
@@ -257,6 +319,10 @@ export function Quiz({
     }
   }
   async function finish() {
+    if (imagePending) {
+      setError("请先完成或取消待上传的图片，再交卷。");
+      return;
+    }
     if (locked.current) return;
     const saved = dirty ? await persist() : current.current;
     if (!saved) return;
@@ -334,7 +400,7 @@ export function Quiz({
                 : String.fromCharCode(65 + n),
             )
             .join("、");
-        return `## ${i + 1}. ${questionTypes[typeOf(item)].label}\n\n${item.question}\n\n${item.options.map((o, n) => `${String.fromCharCode(65 + n)}. ${o}`).join("\n")}\n\n我的作答：${item.text || choice || "未作答"}\n\n参考答案：${answer}\n\n解析：${item.explanation || ""}\n\n得分：${item.earned ?? (item.correct ? 1 : 0)} / ${item.points || 1}${item.grading === "self_assessed" ? "（自评）" : ""}\n\n${(item.rubric || []).map((r) => `- ${r.text}（${r.points} 分）`).join("\n")}\n\n依据：${(
+        return `## ${i + 1}. ${questionTypes[typeOf(item)].label}\n\n${item.question}\n\n${item.options.map((o, n) => `${String.fromCharCode(65 + n)}. ${o}`).join("\n")}\n\n我的作答：${item.text || choice || (item.images?.length ? "见作答图片" : "未作答")}${(item.images || []).map((image, index) => `\n\n[作答图片 ${index + 1}（需登录查看）](${window.location.origin}${image.url})`).join("")}\n\n参考答案：${answer}\n\n解析：${item.explanation || ""}\n\n得分：${item.earned ?? (item.correct ? 1 : 0)} / ${item.points || 1}${item.grading === "self_assessed" ? "（自评）" : ""}\n\n${(item.rubric || []).map((r) => `- ${r.text}（${r.points} 分）`).join("\n")}\n\n依据：${(
           item.refs || []
         )
           .map((n) => {
@@ -356,7 +422,8 @@ export function Quiz({
   const unanswered =
     attempt?.items.filter(
       (item) =>
-        !item.submitted && !filled(item.id === q?.id ? draft : draftOf(item)),
+        !item.submitted &&
+        !filled(item.id === q?.id ? draft : draftOf(item), item.images),
     ).length || 0;
   return (
     <div className="learning-detail exam-workspace">
@@ -569,8 +636,8 @@ export function Quiz({
                         key={item.id}
                         disabled={busy}
                         aria-current={i === index ? "step" : undefined}
-                        aria-label={`第${attempt.items.findIndex((x) => x.id === item.id) + 1}题${item.grading === "self_pending" ? "，待自评" : item.submitted ? (item.correct ? "，已掌握" : "，待巩固") : filled(item.id === q?.id ? draft : draftOf(item)) ? "，已作答" : "，未作答"}`}
-                        className={`${i === index ? "current " : ""}${item.grading === "self_pending" ? "review" : item.submitted ? (item.correct ? "correct" : "incorrect") : filled(item.id === q?.id ? draft : draftOf(item)) ? "draft" : ""}`}
+                        aria-label={`第${attempt.items.findIndex((x) => x.id === item.id) + 1}题${item.grading === "self_pending" ? "，待自评" : item.submitted ? (item.correct ? "，已掌握" : "，待巩固") : filled(item.id === q?.id ? draft : draftOf(item), item.images) ? "，已作答" : "，未作答"}`}
+                        className={`${i === index ? "current " : ""}${item.grading === "self_pending" ? "review" : item.submitted ? (item.correct ? "correct" : "incorrect") : filled(item.id === q?.id ? draft : draftOf(item), item.images) ? "draft" : ""}`}
                         onClick={() => void navigate(() => setIndex(i))}
                       >
                         {attempt.items.findIndex((x) => x.id === item.id) + 1}
@@ -605,23 +672,17 @@ export function Quiz({
                   </div>
                   <MarkdownRenderer content={q.question} />
                   {!objectiveTypes.includes(typeOf(q)) ? (
-                    <label className="exam-written-answer">
-                      我的作答
-                      <textarea
-                        aria-label="我的作答"
-                        value={draft.text || ""}
-                        maxLength={12000}
-                        rows={typeOf(q) === "fill_blank" ? 3 : 8}
-                        disabled={q.submitted || submitting}
-                        onChange={(e) => updateDraft({ text: e.target.value })}
-                        placeholder={
-                          typeOf(q) === "fill_blank"
-                            ? "按（1）（2）顺序填写各空答案，注意单位与精度"
-                            : "分点写出答案；计算与证明题请保留步骤。支持输入 LaTeX 公式。"
-                        }
-                      />
-                      <small>{(draft.text || "").length} / 12000</small>
-                    </label>
+                    <AnswerEditor
+                      text={draft.text || ""}
+                      images={q.images || []}
+                      disabled={submitting || imageBusy}
+                      submitted={q.submitted}
+                      short={typeOf(q) === "fill_blank"}
+                      onChange={(text) => updateDraft({ text })}
+                      onUpload={(file, key) => changeImage(file, key)}
+                      onRemove={(id) => changeImage(undefined, undefined, id)}
+                      onPendingChange={setImagePending}
+                    />
                   ) : (
                     <fieldset
                       className="quiz-options exam-options"
@@ -695,7 +756,9 @@ export function Quiz({
                       {attempt.delivery !== "exam" && (
                         <button
                           className="button primary"
-                          disabled={busy || !filled(draft)}
+                          disabled={
+                            busy || imagePending || !filled(draft, q.images)
+                          }
                           onClick={() => void persist(true)}
                         >
                           提交本题，查看解析

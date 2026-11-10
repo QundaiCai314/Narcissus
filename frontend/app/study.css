@@ -145,7 +145,7 @@
   font-size: 14px;
   color: var(--ink-secondary);
 }
-.study-dialog .learning-form input:not([type="checkbox"]),
+.study-dialog .learning-form input:not([type="checkbox"]):not([type="radio"]),
 .study-dialog .learning-form select,
 .study-dialog .learning-form textarea {
   width: 100%;
@@ -422,6 +422,95 @@
   font-size: 16px;
   line-height: 1.7;
   padding: 16px;
+}
+.answer-editor-heading,
+.answer-editor-actions,
+.answer-formula-buttons,
+.answer-upload-retry,
+.answer-images figcaption {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.answer-editor-heading,
+.answer-images figcaption {
+  justify-content: space-between;
+}
+.exam-answer-editor {
+  margin-top: 24px;
+  min-width: 0;
+}
+.answer-formulas,
+.answer-preview {
+  padding: 16px;
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg);
+}
+.answer-formulas p {
+  margin-top: 12px;
+}
+.answer-preview h4 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--ink-secondary);
+}
+.answer-preview .markdown-body {
+  font-size: 16px;
+  line-height: 1.7;
+}
+.answer-preview {
+  overflow-wrap: anywhere;
+}
+.study-dialog .answer-file-input {
+  display: none;
+}
+.answer-image-help {
+  margin: 16px 0;
+}
+.answer-images {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+.answer-images figure {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  min-width: 0;
+}
+.answer-images img {
+  display: block;
+  width: 100%;
+  height: 192px;
+  object-fit: contain;
+  background: white;
+}
+.answer-images figcaption {
+  margin-top: 12px;
+}
+.answer-upload-retry {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 680px) {
+  .answer-editor-heading {
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .answer-editor-actions {
+    width: 100%;
+  }
+  .study-dialog .answer-editor-actions .button,
+  .study-dialog .answer-formula-buttons .button {
+    padding: 8px 12px;
+  }
+  .answer-images {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .study-dialog .exam-page-controls {
   position: sticky;

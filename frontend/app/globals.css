@@ -97,13 +97,14 @@ textarea,
 select {
   color: var(--ink);
 }
-input[type="checkbox"] {
+input[type="checkbox"],
+input[type="radio"] {
   accent-color: var(--green);
   width: 15px;
   height: 15px;
   cursor: pointer;
 }
-input:not([type="checkbox"]),
+input:not([type="checkbox"]):not([type="radio"]),
 textarea {
   outline: none;
   border: 1px solid var(--line);
@@ -122,7 +123,7 @@ select:focus {
 label {
   display: block;
 }
-label > input:not([type="checkbox"]) {
+label > input:not([type="checkbox"]):not([type="radio"]) {
   margin-top: 9px;
 }
 .topbar {
@@ -2236,6 +2237,10 @@ label > input:not([type="checkbox"]) {
 .quiz-options input {
   margin-top: 6px;
   accent-color: #427259;
+}
+.quiz-options input:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 4px;
 }
 .quiz-options label span:last-child {
   overflow-wrap: anywhere;

@@ -3,12 +3,13 @@ Never serialize the private quiz result directly to a client.
 """
 
 import random
+import logging
 from typing import Literal
 from uuid import UUID
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, UploadFile, File, Form, Response
 from pydantic import BaseModel, Field, model_validator, StrictInt
 from sqlalchemy import select, func
-from . import access, quiz_rules
+from . import access, quiz_rules, quiz_images, storage
 from .db import db_session
 from .errors import fail
 from .models import LearningSet, CardProgress, QuizAttempt, Document, Chunk, now, uid
@@ -518,7 +519,8 @@ def attempt_json(db, row, a):
         q, answer = questions[qid], a.answers.get(qid, {})
         public = quiz_rules.public_question(q)
         public.update(selected=answer.get("selected"), selected_indices=answer.get("selected_indices", []),
-                      text=answer.get("text", ""), submitted=bool(answer.get("submitted")))
+                      text=answer.get("text", ""), submitted=bool(answer.get("submitted")),
+                      images=quiz_images.public_images(a.id, qid, answer.get("images", [])))
         if answer.get("submitted"):
             public.update(point=q["point"], correct=answer.get("correct"),
                           earned=answer.get("earned", int(bool(answer.get("correct")))),
@@ -658,9 +660,12 @@ def question_in(row, a, question_id):
     return next(q for q in row.result["items"] if q["id"] == question_id)
 
 
-def validated_response(q, data, allow_empty=True):
+def validated_response(q, data, allow_empty=True, images=None):
     try:
-        return quiz_rules.response_value(q, data, allow_empty)
+        result = quiz_rules.response_value(q, data, allow_empty or bool(images))
+        if images:
+            result["images"] = images
+        return result
     except ValueError as e:
         fail(422, "invalid_answer", str(e))
 
@@ -677,8 +682,8 @@ def save_answer(attempt_id: str, question_id: str, data: AnswerInput,
     q = question_in(row, a, question_id)
     if a.status != "active" or a.answers.get(question_id, {}).get("submitted"):
         fail(409, "already_submitted", "本题已提交，不能修改；可以重新练习")
-    response = validated_response(q, data)
     old = a.answers.get(question_id, {})
+    response = validated_response(q, data, images=old.get("images"))
     if all(old.get(k) == v for k, v in response.items()): return attempt_json(db, row, a)
     check_revision(a, data.revision)
     a.answers = {**a.answers, question_id: dict(response, max_points=quiz_rules.points(q), submitted=False)}
@@ -694,8 +699,8 @@ def submit_answer(attempt_id: str, question_id: str, data: AnswerInput,
     q = question_in(row, a, question_id)
     if a.mode in ("exam", "wrong_exam"):
         fail(409, "exam_requires_finish", "整卷自测请统一交卷，交卷前不显示答案")
-    response = validated_response(q, data, False)
     old = a.answers.get(question_id, {})
+    response = validated_response(q, data, False, old.get("images"))
     if old.get("submitted"):
         if any(old.get(k) != v for k, v in response.items()):
             fail(409, "already_submitted", "本题已提交，不能修改答案")
@@ -744,6 +749,88 @@ def self_assess(attempt_id: str, question_id: str, data: AssessmentInput,
     a.revision += 1
     finalize_attempt(a)
     db.commit()
+    return attempt_json(db, row, a)
+
+
+def editable_image_answer(row, a, question_id):
+    q = question_in(row, a, question_id)
+    old = a.answers.get(question_id, {})
+    if quiz_rules.kind(q) in quiz_rules.OBJECTIVE:
+        fail(422, "objective_answer", "选择题与判断题请直接选择选项")
+    if a.status != "active" or old.get("submitted"):
+        fail(409, "already_submitted", "本题已提交，不能修改图片")
+    return q, old
+
+
+@router.post("/quiz-attempts/{attempt_id}/answers/{question_id}/images")
+def upload_answer_image(attempt_id: str, question_id: str, file: UploadFile = File(...),
+                        revision: int = Form(..., ge=1), request_key: UUID = Form(...),
+                        user=Depends(current_user), db=Depends(db_session)):
+    row, a = owned_attempt(db, user.id, attempt_id, True)
+    q, old = editable_image_answer(row, a, question_id)
+    images = old.get("images", [])
+    image_id = str(request_key)
+    if any(i["id"] == image_id for i in images):
+        return attempt_json(db, row, a)
+    check_revision(a, revision)
+    if len(images) >= quiz_images.MAX_IMAGES:
+        fail(422, "answer_image_limit", "每题最多上传 4 张图片，请先删除不需要的图片")
+    rate_limit("quiz_images:" + user.id, 120, 3600)
+    data, width, height = quiz_images.normalize(file.file.read(quiz_images.MAX_BYTES + 1))
+    key = f"quiz-answers/{user.id}/{a.id}/{question_id}/{image_id}.jpg"
+    try:
+        storage.put(key, data, "image/jpeg")
+    except Exception:
+        fail(503, "answer_image_storage", "图片暂时无法保存，请稍后重试")
+    a.answers = {**a.answers, question_id: {**old, "max_points": quiz_rules.points(q),
+        "images": images + [{"id": image_id, "key": key, "width": width, "height": height}]}}
+    a.revision += 1
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        try:
+            storage.remove(key)
+        except Exception:
+            logging.getLogger(__name__).warning("Unable to clean up failed answer image upload")
+        raise
+    return attempt_json(db, row, a)
+
+
+@router.get("/quiz-attempts/{attempt_id}/answers/{question_id}/images/{image_id}")
+def get_answer_image(attempt_id: str, question_id: str, image_id: str,
+                     user=Depends(current_user), db=Depends(db_session)):
+    row, a = owned_attempt(db, user.id, attempt_id)
+    question_in(row, a, question_id)
+    image = next((i for i in a.answers.get(question_id, {}).get("images", []) if i["id"] == image_id), None)
+    if not image:
+        fail(404, "answer_image_not_found", "作答图片不存在")
+    try:
+        data = storage.read(image["key"])
+    except Exception:
+        fail(503, "answer_image_storage", "暂时无法读取作答图片，请稍后重试")
+    return Response(data, media_type="image/jpeg", headers={
+        "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff",
+        "Content-Disposition": 'inline; filename="answer.jpg"'})
+
+
+@router.delete("/quiz-attempts/{attempt_id}/answers/{question_id}/images/{image_id}")
+def delete_answer_image(attempt_id: str, question_id: str, image_id: str, data: RevisionInput,
+                        user=Depends(current_user), db=Depends(db_session)):
+    row, a = owned_attempt(db, user.id, attempt_id, True)
+    _, old = editable_image_answer(row, a, question_id)
+    images = old.get("images", [])
+    image = next((i for i in images if i["id"] == image_id), None)
+    if not image:
+        return attempt_json(db, row, a)
+    check_revision(a, data.revision)
+    a.answers = {**a.answers, question_id: {**old, "images": [i for i in images if i["id"] != image_id]}}
+    a.revision += 1
+    db.commit()
+    try:
+        storage.remove(image["key"])
+    except Exception:
+        logging.getLogger(__name__).warning("Unable to remove detached answer image")
     return attempt_json(db, row, a)
 
 

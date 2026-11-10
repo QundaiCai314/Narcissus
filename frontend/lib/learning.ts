@@ -83,6 +83,7 @@ export type CardProgress = {
   shuffled: boolean;
   updated_at: string;
 };
+export type QuizImage = { id: string; url: string; width: number; height: number };
 export type QuizQuestion = {
   id: string;
   question: string;
@@ -93,6 +94,7 @@ export type QuizQuestion = {
   points?: number;
   selected_indices?: number[];
   text?: string;
+  images?: QuizImage[];
   correct_indices?: number[];
   answer?: string;
   rubric?: { id: string; text: string; points: number }[];

@@ -53,7 +53,7 @@ select:focus-visible {
   outline: 2px solid var(--green);
   outline-offset: 4px;
 }
-input:not([type="checkbox"]),
+input:not([type="checkbox"]):not([type="radio"]),
 textarea,
 select {
   background: var(--paper);
