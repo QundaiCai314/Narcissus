@@ -106,17 +106,19 @@ async def chat_stream(messages, max_tokens=None, *, json_mode=False, reasoning_e
     payload = {
         "model": s.chat_model,
         "messages": messages,
-        "temperature": s.chat_temperature,
-        "max_tokens": max_tokens or s.chat_max_tokens,
+        s.chat_max_tokens_parameter: max_tokens or s.chat_max_tokens,
         "stream": True,
     }
+    if s.chat_send_temperature:
+        payload["temperature"] = s.chat_temperature
     if s.chat_send_usage:
         payload["stream_options"] = {"include_usage": True}
     # Opt in per caller/provider: compatible endpoints need not support these fields.
     if json_mode:
         payload["response_format"] = {"type": "json_object"}
-    if reasoning_effort:
-        payload["reasoning_effort"] = reasoning_effort
+    effort = reasoning_effort or s.chat_reasoning_effort
+    if effort:
+        payload["reasoning_effort"] = effort
     try:
         async with httpx.AsyncClient(
             timeout=httpx.Timeout(s.model_timeout_seconds, connect=10)

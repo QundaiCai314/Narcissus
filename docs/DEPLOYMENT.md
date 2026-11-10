@@ -34,6 +34,9 @@ docker compose down
 |---|---|
 | CHAT_API_KEY / CHAT_BASE_URL / CHAT_MODEL | 流式 Chat Completions；Base URL 一般含 `/v1` |
 | CHAT_TEMPERATURE / CHAT_MAX_TOKENS | 默认 0.1 / 8192 |
+| CHAT_MAX_TOKENS_PARAMETER | 默认 `max_tokens`；需要新式输出预算参数的服务设为 `max_completion_tokens` |
+| CHAT_SEND_TEMPERATURE | 默认 true；推理模型不接受温度参数时设为 false |
+| CHAT_REASONING_EFFORT | 默认留空，由供应商决定；可指定 none / low / medium / high / xhigh / max，调用方显式值优先 |
 | CHAT_SEND_USAGE | 供应商不支持 `stream_options` 时设为 false |
 | EMBEDDING_API_KEY / EMBEDDING_BASE_URL / EMBEDDING_MODEL | 独立的 Embeddings 接口 |
 | EMBEDDING_DIMENSIONS | 必须与模型实际输出一致，默认 1024 |
@@ -45,7 +48,9 @@ docker compose down
 | GENERATION_TIMEOUT_SECONDS | 整轮回答总时限，默认 180 秒 |
 | RETRIEVAL_MAX_DISTANCE | 余弦距离最大阈值，默认 0.55 |
 
-示例配置给出了国内服务常见兼容端点名称，需要自行确认当前账号支持的模型与参数并填入有效密钥。修改配置后：`docker compose up -d --force-recreate api worker beat`。
+示例配置给出了国内服务常见兼容端点名称，需要自行确认当前账号支持的模型与参数并填入有效密钥。只更新聊天配置与兼容代码时：`docker compose up -d --build --no-deps api worker`。该命令不会运行迁移或重建数据库、对象存储及 Redis；不涉及调度配置时无需更新 beat。
+
+`gpt-5.6-luna` 使用 `CHAT_MAX_TOKENS_PARAMETER=max_completion_tokens`、`CHAT_SEND_TEMPERATURE=false`。`CHAT_REASONING_EFFORT` 按实际出题验证结果设置；复杂计算与主观题需检查完整生成、独立解答及逐题复核，不能只凭一次简单回答判断可用。密钥及实际供应商地址保存在忽略提交的 `.env`。更换聊天模型时保留原 Embedding 配置与维数。
 
 更换 Embedding 端点、模型或维数后，旧资料向量不会与新模型混用；第一版需删除并重新上传相关资料以重新建立向量。对话模型可独立更换。没有密钥时不返回固定假答案，不开启测试模型。
 

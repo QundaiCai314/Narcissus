@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     chat_model: str = "deepseek-chat"
     chat_temperature: float = 0.1
     chat_max_tokens: int = 8192
+    chat_max_tokens_parameter: Literal["max_tokens", "max_completion_tokens"] = "max_tokens"
+    chat_send_temperature: bool = True
+    chat_reasoning_effort: Literal["", "none", "low", "medium", "high", "xhigh", "max"] = ""
     chat_send_usage: bool = True
     embedding_api_key: str = ""
     embedding_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
