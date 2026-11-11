@@ -13,7 +13,6 @@ import {
   X,
   Search,
   Library,
-  Compass,
   LockKeyhole,
 } from "lucide-react";
 import { api, post, errorText, Notebook, Page } from "@/lib/api";
@@ -159,11 +158,6 @@ export default function Home() {
             <a className="sidebar-link active" href="#library">
               <Library size={18} />
               我的笔记本<span>{total}</span>
-            </a>
-            <a className="sidebar-link" href="#reading-method">
-              <Compass size={18} />
-              研读手记
-              <ArrowUpRight size={14} />
             </a>
           </nav>
           <button className="sidebar-create" onClick={create}>
@@ -367,39 +361,6 @@ export default function Home() {
                 )}
               </>
             )}
-          </section>
-          <section
-            className="reading-method"
-            id="reading-method"
-            aria-labelledby="method-title"
-          >
-            <div>
-              <span className="eyebrow">A SMALL READING RITUAL</span>
-              <h2 id="method-title">从阅读，到理解。</h2>
-            </div>
-            <ol>
-              <li>
-                <span>01</span>
-                <div>
-                  <h3>收集值得细读的资料</h3>
-                  <p>文档、网页或随手记下的文字，都可以成为起点。</p>
-                </div>
-              </li>
-              <li>
-                <span>02</span>
-                <div>
-                  <h3>带着问题，回到原文</h3>
-                  <p>梳理观点、比较线索，通过引用核对每一处发现。</p>
-                </div>
-              </li>
-              <li>
-                <span>03</span>
-                <div>
-                  <h3>写下自己的理解</h3>
-                  <p>将发现沉淀成笔记、导读与学习卡，让知识留下来。</p>
-                </div>
-              </li>
-            </ol>
           </section>
           {cleanup.length > 0 && (
             <section className="cleanup">

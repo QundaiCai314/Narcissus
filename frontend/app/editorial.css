@@ -607,46 +607,6 @@ textarea:focus {
 .library-empty .text-button {
   margin: 15px auto 0;
 }
-.reading-method {
-  margin-top: 46px;
-  border-top: 1px solid var(--line);
-  padding: 35px 0;
-  display: grid;
-  grid-template-columns: 1fr 2fr;
-  gap: 40px;
-}
-.reading-method h2 {
-  font: 24px var(--serif);
-  margin-top: 12px;
-}
-.reading-method ol {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 21px;
-}
-.reading-method li {
-  display: flex;
-  gap: 18px;
-}
-.reading-method li > span {
-  color: #969d85;
-  font:
-    italic 17px Georgia,
-    serif;
-  padding-top: 1px;
-}
-.reading-method h3 {
-  font-size: 13px;
-  font-weight: 500;
-  margin-bottom: 5px;
-}
-.reading-method p {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.8;
-}
 .library-footer {
   border-top: 1px solid var(--line);
   padding: 22px 0 28px;
@@ -1374,10 +1334,6 @@ textarea:focus {
   .collection-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .reading-method {
-    grid-template-columns: 1fr;
-    gap: 25px;
-  }
   .library-toolbar {
     flex-wrap: wrap;
   }
@@ -1567,9 +1523,6 @@ textarea:focus {
   }
   .collection-new > span:last-child {
     font-size: 9px;
-  }
-  .reading-method {
-    margin-top: 30px;
   }
   .library-footer {
     font-size: 9px;
