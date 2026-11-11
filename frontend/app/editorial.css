@@ -188,8 +188,15 @@ textarea:focus {
   flex-direction: column;
   position: sticky;
   top: 0;
-  height: calc(100dvh - 76px);
+  /* The header scrolls away; the pinned sidebar must cover the full viewport. */
+  height: 100dvh;
+  align-self: start;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
   background: #f1f1e8;
+}
+.library-sidebar > * {
+  flex-shrink: 0;
 }
 .sidebar-caption {
   color: var(--muted);
