@@ -305,19 +305,41 @@
 .emoji-grid button:hover {
   background: var(--green-light);
 }
-.image-upload-panel {
-  padding: 12px 0;
-  text-align: center;
-  color: var(--muted);
-  font-size: 13px;
+.compose-image-strip {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
 }
-.image-upload-panel .button {
+.image-upload-panel {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.image-upload-action {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  flex: none;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--green-light);
+  color: var(--green);
+  font-size: 14px;
 }
-.image-upload-panel p {
-  margin: 12px 0 4px;
+.image-upload-action:hover { background: var(--bg); }
+.image-upload-action:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+.image-upload-copy { flex: 1; min-width: 0; line-height: 1.7; }
+.image-upload-copy small { font-size: 12px; }
+.image-upload-panel p { margin: 0; color: var(--ink-secondary); }
+@media (max-width: 680px) {
+  .image-upload-panel { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+  .image-upload-action { justify-self: start; }
+  .image-upload-copy { grid-column: 1 / -1; grid-row: 2; }
+  .image-upload-panel > .compose-icon { grid-column: 2; grid-row: 1; }
 }
 .compose-error {
   padding: 10px 12px;

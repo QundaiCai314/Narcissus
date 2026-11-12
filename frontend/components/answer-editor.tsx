@@ -286,7 +286,7 @@ export function AnswerEditor({
         </div>
         {palette && (
           <div
-            className="compose-palette"
+            className={palette === "image" ? "compose-image-strip" : "compose-palette"}
             onKeyDown={(e) => {
               if (e.key === "Escape") {
                 e.preventDefault();
@@ -295,8 +295,8 @@ export function AnswerEditor({
               }
             }}
           >
-            <div className="compose-palette-heading">
-              <span>{palette === "emoji" ? "表情" : "手写答案与截图"}</span>
+            {palette === "emoji" && <div className="compose-palette-heading">
+              <span>表情</span>
               <button
                 type="button"
                 className="compose-icon"
@@ -305,7 +305,7 @@ export function AnswerEditor({
               >
                 <X size={16} />
               </button>
-            </div>
+            </div>}
             {palette === "emoji" ? (
               <div className="emoji-grid">
                 {emojis.map((emoji) => (
@@ -323,14 +323,17 @@ export function AnswerEditor({
               <div className="image-upload-panel">
                 <button
                   type="button"
-                  className="button"
+                  className="image-upload-action"
                   onClick={() => picker.current?.click()}
                 >
                   <Upload size={16} />
                   选择图片
                 </button>
-                <p>或拖入图片、粘贴截图</p>
-                <small>JPG / PNG / WebP · 每张 ≤ 8 MB · 最多 4 张</small>
+                <div className="image-upload-copy">
+                  <p>也可拖入图片，或直接粘贴截图</p>
+                  <small>JPG / PNG / WebP · 单张 ≤ 8 MB · 最多 4 张</small>
+                </div>
+                <button type="button" className="compose-icon" aria-label="关闭工具面板" onClick={() => setPalette(null)}><X size={16} /></button>
               </div>
             )}
           </div>
