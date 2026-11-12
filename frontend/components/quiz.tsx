@@ -764,11 +764,6 @@ export function Quiz({
                           提交本题，查看解析
                         </button>
                       )}
-                      {attempt.delivery === "exam" && (
-                        <span className="muted">
-                          交卷前可修改，答案与解析暂不显示。
-                        </span>
-                      )}
                     </div>
                   ) : (
                     <div className="exam-feedback">
