@@ -13,10 +13,10 @@ import {
   X,
   Search,
   Library,
-  LockKeyhole,
 } from "lucide-react";
 import { api, post, errorText, Notebook, Page } from "@/lib/api";
 import { Header, Loading, ErrorNotice, PaperStudy } from "@/components/shared";
+import { version } from "../package.json";
 
 type Cleanup = {
   id: string;
@@ -178,8 +178,8 @@ export default function Home() {
             </span>
           </div>
           <div className="sidebar-private">
-            <LockKeyhole size={13} />
-            仅自己可见
+            <span>Narcissus</span>
+            <span>v{version}</span>
           </div>
         </aside>
         <main className="library-main">

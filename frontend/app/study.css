@@ -1,5 +1,5 @@
 /* Reading and practice share the existing paper, ink and moss palette. */
-.workspace-dialog.study-dialog {
+.workspace-dialog.study-dialog.quiz-focus {
   inset: 0;
   margin: 0;
   width: 100%;
@@ -17,6 +17,35 @@
 .study-dialog .studio-detail-heading .button {
   font-size: 14px;
   min-height: 44px;
+}
+.study-dialog .studio-detail-heading .brand {
+  min-height: 44px;
+}
+.study-return {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  color: var(--ink-secondary);
+  font-size: 14px;
+}
+.study-return-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--green);
+}
+.study-return:hover {
+  background: var(--green-light);
+  color: var(--green);
+}
+.study-return:hover .study-return-icon {
+  border-color: var(--green);
 }
 .study-dialog .learning-area {
   min-height: 0;

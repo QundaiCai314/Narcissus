@@ -22,12 +22,14 @@ export function LearningPanel({
   onAsk,
   studioRequest,
   onDirtyChange,
+  onFocusChange,
 }: {
   notebookId: string;
   docs: Document[];
   onCitation: OnCitation;
   onAsk: (context: LearningContext, title: string, sourceIds: string[]) => void;
   onDirtyChange?: (dirty: boolean) => void;
+  onFocusChange?: (focused: boolean) => void;
   studioRequest?: {
     key: number;
     id?: string;
@@ -271,30 +273,38 @@ export function LearningPanel({
   }
   const active = row && ["queued", "running"].includes(row.status),
     visible = items.filter((x) => filter === "all" || x.kind === filter);
+  const focusedQuiz =
+    !form && row?.kind === "quiz" && row.status === "complete";
+  useEffect(() => {
+    onFocusChange?.(focusedQuiz);
+    return () => onFocusChange?.(false);
+  }, [focusedQuiz, onFocusChange]);
   return (
     <section
       className={`writing-area learning-area ${form && kind === "quiz" ? "quiz-planning" : row?.kind === "quiz" ? "quiz-reading" : ""}`}
     >
-      <div className="writing-heading">
-        <div>
-          <span className="eyebrow">从理解，到掌握</span>
-          <h2>
-            {form && kind === "quiz"
-              ? "准备一份练习"
-              : row?.kind === "quiz"
-                ? row.params.subject || "课程练习"
-                : "主动学习"}
-          </h2>
+      {!focusedQuiz && (
+        <div className="writing-heading">
+          <div>
+            <span className="eyebrow">从理解，到掌握</span>
+            <h2>
+              {form && kind === "quiz"
+                ? "准备一份练习"
+                : row?.kind === "quiz"
+                  ? row.params.subject || "课程练习"
+                  : "主动学习"}
+            </h2>
+          </div>
+          <button
+            className="button"
+            onClick={() => newForm()}
+            disabled={busy}
+            hidden={form}
+          >
+            ＋ 创建学习内容
+          </button>
         </div>
-        <button
-          className="button"
-          onClick={() => newForm()}
-          disabled={busy}
-          hidden={form}
-        >
-          ＋ 创建学习内容
-        </button>
-      </div>
+      )}
       {error && (
         <p className="message-error writing-error" role="alert">
           {error}
@@ -310,69 +320,71 @@ export function LearningPanel({
           </button>
         </p>
       )}
-      <details
-        className="learning-collection"
-        open={libraryOpen}
-        onToggle={(e) => setLibraryOpen(e.currentTarget.open)}
-      >
-        <summary>
-          学习内容 <span>{total} 个版本</span>
-        </summary>
-        <div className="learning-library">
-          <div className="learning-filters">
-            {[
-              ["all", "全部"],
-              ["mindmap", "思维导图"],
-              ["flashcards", "闪卡"],
-              ["quiz", "测验"],
-            ].map(([value, label]) => (
-              <button
-                key={value}
-                className={filter === value ? "active" : ""}
-                aria-pressed={filter === value}
-                onClick={() => setFilter(value)}
-              >
-                {label}
-              </button>
-            ))}
-            <span className="muted">{total} 个版本</span>
-          </div>
-          <select
-            aria-label="选择学习成果"
-            value={visible.some((i) => i.id === row?.id) ? row?.id || "" : ""}
-            onChange={(e) => open(e.target.value)}
-          >
-            <option value="">选择已生成的学习内容</option>
-            {visible.map((x) => (
-              <option key={x.id} value={x.id}>
-                {x.title} · 第 {x.version} 版 ·{" "}
-                {phaseNames[x.phase] || x.status}
-              </option>
-            ))}
-          </select>
-          {items.length < total && (
-            <button
-              onClick={async () => {
-                try {
-                  const p = await api<Page<LearningSet>>(
-                    `/notebooks/${notebookId}/learning?limit=100&offset=${items.length}`,
-                  );
-                  loadedPages.current += 1;
-                  setItems((v) => [
-                    ...new Map(
-                      [...v, ...p.items].map((x) => [x.id, x]),
-                    ).values(),
-                  ]);
-                } catch (e) {
-                  setError(errorText(e));
-                }
-              }}
+      {!focusedQuiz && (
+        <details
+          className="learning-collection"
+          open={libraryOpen}
+          onToggle={(e) => setLibraryOpen(e.currentTarget.open)}
+        >
+          <summary>
+            学习内容 <span>{total} 个版本</span>
+          </summary>
+          <div className="learning-library">
+            <div className="learning-filters">
+              {[
+                ["all", "全部"],
+                ["mindmap", "思维导图"],
+                ["flashcards", "闪卡"],
+                ["quiz", "测验"],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  className={filter === value ? "active" : ""}
+                  aria-pressed={filter === value}
+                  onClick={() => setFilter(value)}
+                >
+                  {label}
+                </button>
+              ))}
+              <span className="muted">{total} 个版本</span>
+            </div>
+            <select
+              aria-label="选择学习成果"
+              value={visible.some((i) => i.id === row?.id) ? row?.id || "" : ""}
+              onChange={(e) => open(e.target.value)}
             >
-              加载更多
-            </button>
-          )}
-        </div>
-      </details>
+              <option value="">选择已生成的学习内容</option>
+              {visible.map((x) => (
+                <option key={x.id} value={x.id}>
+                  {x.title} · 第 {x.version} 版 ·{" "}
+                  {phaseNames[x.phase] || x.status}
+                </option>
+              ))}
+            </select>
+            {items.length < total && (
+              <button
+                onClick={async () => {
+                  try {
+                    const p = await api<Page<LearningSet>>(
+                      `/notebooks/${notebookId}/learning?limit=100&offset=${items.length}`,
+                    );
+                    loadedPages.current += 1;
+                    setItems((v) => [
+                      ...new Map(
+                        [...v, ...p.items].map((x) => [x.id, x]),
+                      ).values(),
+                    ]);
+                  } catch (e) {
+                    setError(errorText(e));
+                  }
+                }}
+              >
+                加载更多
+              </button>
+            )}
+          </div>
+        </details>
+      )}
       {form && kind === "quiz" && (
         <nav className="quiz-steps" aria-label="出题步骤">
           {["选择资料", "设置试卷", "确认方案"].map((name, n) => (
@@ -789,90 +801,92 @@ export function LearningPanel({
           </div>
         ) : row ? (
           <>
-            <details
-              className="quiz-paper-details"
-              open={row.kind !== "quiz" || row.status !== "complete"}
-            >
-              <summary>
-                {row.title}
-                <span>试卷信息与来源</span>
-              </summary>
-              <div className="learning-result-heading">
-                <span className="eyebrow">
-                  {kindNames[row.kind]} · 第 {row.version} 版
-                </span>
-                <h3>{row.title}</h3>
-                <p className="muted">
-                  {new Date(row.created_at).toLocaleString("zh-CN")} ·{" "}
-                  {row.sources.length} 份资料
-                  {row.status === "complete"
-                    ? ` · ${row.count} ${row.kind === "mindmap" ? "个节点" : row.kind === "flashcards" ? "张卡片" : "道题"}`
-                    : ""}
-                </p>
-                <div className="learning-sources">
-                  {row.sources.map((s) => (
-                    <span key={s.id}>
-                      {s.filename} · 资料版本 {s.version}
-                      {s.state === "deleted"
-                        ? " · 原始资料已删除"
-                        : s.state === "changed"
-                          ? " · 资料已更新"
-                          : ""}
-                    </span>
-                  ))}
-                </div>
-                {row.sources.some((s) => s.state !== "active") && (
-                  <p className="source-warning">
-                    保留的是历史学习版本和来源快照。失效来源不可跳转核验；原有学习记录仍然保留。
-                  </p>
-                )}
-                <div className="learning-toolbar">
-                  <span role="status">
-                    {phaseNames[row.phase] || row.status}
+            {!focusedQuiz && (
+              <details
+                className="quiz-paper-details"
+                open={row.kind !== "quiz" || row.status !== "complete"}
+              >
+                <summary>
+                  {row.title}
+                  <span>试卷信息与来源</span>
+                </summary>
+                <div className="learning-result-heading">
+                  <span className="eyebrow">
+                    {kindNames[row.kind]} · 第 {row.version} 版
                   </span>
-                  {active ? (
-                    <button
-                      className="text-button"
-                      disabled={busy}
-                      onClick={() => task("cancel")}
-                    >
-                      取消生成
-                    </button>
-                  ) : (
-                    <>
+                  <h3>{row.title}</h3>
+                  <p className="muted">
+                    {new Date(row.created_at).toLocaleString("zh-CN")} ·{" "}
+                    {row.sources.length} 份资料
+                    {row.status === "complete"
+                      ? ` · ${row.count} ${row.kind === "mindmap" ? "个节点" : row.kind === "flashcards" ? "张卡片" : "道题"}`
+                      : ""}
+                  </p>
+                  <div className="learning-sources">
+                    {row.sources.map((s) => (
+                      <span key={s.id}>
+                        {s.filename} · 资料版本 {s.version}
+                        {s.state === "deleted"
+                          ? " · 原始资料已删除"
+                          : s.state === "changed"
+                            ? " · 资料已更新"
+                            : ""}
+                      </span>
+                    ))}
+                  </div>
+                  {row.sources.some((s) => s.state !== "active") && (
+                    <p className="source-warning">
+                      保留的是历史学习版本和来源快照。失效来源不可跳转核验；原有学习记录仍然保留。
+                    </p>
+                  )}
+                  <div className="learning-toolbar">
+                    <span role="status">
+                      {phaseNames[row.phase] || row.status}
+                    </span>
+                    {active ? (
                       <button
-                        className="button"
-                        disabled={
-                          busy || row.sources.some((s) => s.state === "deleted")
-                        }
-                        onClick={() => task("regenerate")}
+                        className="text-button"
+                        disabled={busy}
+                        onClick={() => task("cancel")}
                       >
-                        生成新版
+                        取消生成
                       </button>
-                      {["failed", "cancelled"].includes(row.status) &&
-                        row.sources.every((s) => s.state === "active") && (
-                          <button
-                            className="button"
-                            disabled={busy}
-                            onClick={() => task("retry")}
-                          >
-                            重试生成
-                          </button>
-                        )}
-                    </>
+                    ) : (
+                      <>
+                        <button
+                          className="button"
+                          disabled={
+                            busy ||
+                            row.sources.some((s) => s.state === "deleted")
+                          }
+                          onClick={() => task("regenerate")}
+                        >
+                          生成新版
+                        </button>
+                        {["failed", "cancelled"].includes(row.status) &&
+                          row.sources.every((s) => s.state === "active") && (
+                            <button
+                              className="button"
+                              disabled={busy}
+                              onClick={() => task("retry")}
+                            >
+                              重试生成
+                            </button>
+                          )}
+                      </>
+                    )}
+                  </div>
+                  {row.error && (
+                    <p className="message-error" role="alert">
+                      {row.error}
+                    </p>
+                  )}
+                  {row.warning && (
+                    <p className="source-warning">{row.warning}</p>
                   )}
                 </div>
-                {row.error && (
-                  <p className="message-error" role="alert">
-                    {row.error}
-                  </p>
-                )}
-                {row.warning && <p className="source-warning">{row.warning}</p>}
-              </div>
-            </details>
-            {row.kind === "quiz" &&
-              row.status === "complete" &&
-              row.warning && <p className="source-warning">{row.warning}</p>}
+              </details>
+            )}
             {active && (
               <div className="learning-pending">
                 <div className="learning-pulse" />

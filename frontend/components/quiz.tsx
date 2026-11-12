@@ -171,7 +171,7 @@ export function Quiz({
   }
   async function persist(submit = false): Promise<QuizAttempt | null> {
     if (submit && imagePending) {
-      setError("请先完成或取消待上传的图片，再提交作答。");
+      setError("请先完成或取消公式编辑和待上传的图片，再提交作答。");
       return null;
     }
     const value = current.current;
@@ -264,7 +264,7 @@ export function Quiz({
   }
   async function navigate(next: () => void) {
     if (imagePending) {
-      setError("请先完成或取消待上传的图片，再切换题目。");
+      setError("请先完成或取消公式编辑和待上传的图片，再切换题目。");
       return;
     }
     if (locked.current) return;
@@ -274,7 +274,7 @@ export function Quiz({
   }
   async function start(mode: "all" | "wrong") {
     if (imagePending) {
-      setError("请先完成或取消待上传的图片。");
+      setError("请先完成或取消公式编辑和待上传的图片。");
       return;
     }
     if (locked.current) return;
@@ -320,7 +320,7 @@ export function Quiz({
   }
   async function finish() {
     if (imagePending) {
-      setError("请先完成或取消待上传的图片，再交卷。");
+      setError("请先完成或取消公式编辑和待上传的图片，再交卷。");
       return;
     }
     if (locked.current) return;

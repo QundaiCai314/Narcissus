@@ -20,7 +20,8 @@ export function WorkspaceDialog({ open, label, className = "", onClose, children
       aria-label={label}
       className={`workspace-dialog ${className}`}
       onClick={(e) => {
-        if (e.target === ref.current) {
+        const bounds = ref.current?.getBoundingClientRect();
+        if (e.target === ref.current && bounds && (e.clientX < bounds.left || e.clientX > bounds.right || e.clientY < bounds.top || e.clientY > bounds.bottom)) {
           onClose();
         }
       }}

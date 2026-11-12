@@ -1,4 +1,7 @@
 import { cp, mkdir } from "node:fs/promises";
+await mkdir("public/mathlive", { recursive: true });
+await cp("node_modules/mathlive/fonts", "public/mathlive/fonts", { recursive: true });
+await cp("node_modules/mathlive/LICENSE.txt", "public/mathlive/LICENSE.txt");
 await mkdir("public/pdfjs", { recursive: true });
 await cp("node_modules/pdfjs-dist/LICENSE", "public/pdfjs/LICENSE");
 await cp(

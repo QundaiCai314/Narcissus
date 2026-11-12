@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "./editorial.css";
 import "./study.css";
+import "./composer.css";
 
 export const metadata: Metadata = {
   title: "Narcissus · 从阅读到理解",

@@ -28,7 +28,7 @@ import {
   Page,
   Writing,
 } from "@/lib/api";
-import { Header, Loading, ErrorNotice } from "@/components/shared";
+import { Brand, Header, Loading, ErrorNotice } from "@/components/shared";
 import { ChatMessage } from "@/components/message";
 import { SourceImport } from "@/components/source-import";
 import { SourcePreview } from "@/components/source-preview";
@@ -36,6 +36,7 @@ import { sourceNames, importStates } from "@/lib/sources";
 import { GuidePanel } from "@/components/guide-panel";
 import { WritingPanel } from "@/components/writing-panel";
 import { AudioPanel } from "@/components/audio-panel";
+import { ConversationHistory } from "@/components/conversation-history";
 import { LearningPanel } from "@/components/learning-panel";
 import { VisualPanel } from "@/components/visual-panel";
 import { ResearchPanel } from "@/components/research-panel";
@@ -74,6 +75,7 @@ export default function Workspace({
   const [presentationRequest, setPresentationRequest] = useState<StudioRequest>();
   const [infographicRequest, setInfographicRequest] = useState<StudioRequest>();
   const [learningRequest, setLearningRequest] = useState<StudioRequest>();
+  const [quizFocused, setQuizFocused] = useState(false);
   const learningDirty = useRef(false);
   const reportLearningDirty = useCallback((dirty: boolean) => { learningDirty.current = dirty; }, []);
   const {
@@ -328,6 +330,10 @@ export default function Workspace({
               ))
             )}
           </div>
+          <ConversationHistory items={convs} total={convTotal} current={conv} disabled={generating}
+            onSelect={cid => { setConv(cid); currentConv.current = cid; setMobilePanel("chat"); loadMessages(cid).catch(e => setError(errorText(e))); }}
+            onMore={async () => { try { const p = await api<Page<Conversation>>(`/notebooks/${id}/conversations?limit=100&offset=${convs.length}`); setConvs(v => [...new Map([...v, ...p.items].map(c=>[c.id,c])).values()]); } catch(e) { setError(errorText(e)); } }}
+          />
           <div className="sources-foot">
             <span className="dot" />
             资料仅你可见
@@ -341,25 +347,6 @@ export default function Workspace({
                 对话
               </h2>
               <div>
-                <select
-                  aria-label="历史对话"
-                  value={conv}
-                  disabled={generating}
-                  onChange={(e) => {
-                    setConv(e.target.value);
-                    currentConv.current = e.target.value;
-                    loadMessages(e.target.value).catch((e) =>
-                      setError(errorText(e)),
-                    );
-                  }}
-                >
-                  <option value="">新对话</option>
-                  {convs.map((c) => (
-                    <option value={c.id} key={c.id}>
-                      {c.title}
-                    </option>
-                  ))}
-                </select>
                 <button
                   className="icon-button"
                   aria-label="新建对话"
@@ -369,22 +356,7 @@ export default function Workspace({
                 >
                   <Plus size={20} />
                 </button>
-                {convs.length < convTotal && (
-                  <button
-                    onClick={async () => {
-                      try {
-                        const p = await api<Page<Conversation>>(
-                          `/notebooks/${id}/conversations?limit=100&offset=${convs.length}`,
-                        );
-                        setConvs((v) => [...v, ...p.items]);
-                      } catch (e) {
-                        setError(errorText(e));
-                      }
-                    }}
-                  >
-                    更多历史
-                  </button>
-                )}
+
               </div>
             </div>
             <div className="chat-scroll">
@@ -528,10 +500,16 @@ export default function Workspace({
           onOpen={openStudio}
         />
       </main>
-      <WorkspaceDialog className={view === "learning" ? "study-dialog" : ""} open={view !== "chat"} label="工作室内容" onClose={() => closeStudio()}>
+      <WorkspaceDialog className={view === "learning" ? `study-dialog ${quizFocused ? "quiz-focus" : "studio-modal"}` : "studio-modal"} open={view !== "chat"} label="工作室内容" onClose={() => closeStudio()}>
         {view !== "chat" && (
           <>
-            <div className="studio-detail-heading"><span>工作室 / {{ presentation:"演示文稿", infographic:"信息图", research: "联网研究", guide: "资料导读", note: "笔记", summary: "总结", learning: "主动学习", audio: "音频概览", chat: "对话" }[view]}</span><button className="button" onClick={() => closeStudio()}><X size={16}/>返回对话</button></div>
+            <div className="studio-detail-heading">
+              {view === "learning" && quizFocused ? <Brand onNavigate={() => !learningDirty.current || window.confirm("当前作答尚未保存，返回主页会放弃这些修改。仍要离开吗？")} /> : <span className="studio-modal-title">{{ presentation:"演示文稿", infographic:"信息图", research: "联网研究", guide: "资料导读", note: "笔记", summary: "总结", learning: "主动学习", audio: "音频概览", chat: "对话" }[view]}</span>}
+              <button aria-label={view === "learning" && quizFocused ? "返回对话" : "关闭弹窗"} className={view === "learning" && quizFocused ? "study-return" : "studio-close"} onClick={() => closeStudio()}>
+                {view === "learning" && quizFocused ? <span className="study-return-icon"><ArrowLeft size={16} aria-hidden="true" /></span> : <X size={16} />}
+                {view === "learning" && quizFocused && <span>返回对话</span>}
+              </button>
+            </div>
             {view === "presentation" && <VisualPanel notebookId={id} kind="presentation" docs={docs} request={presentationRequest} onCitation={setPreview}/>}
             {view === "infographic" && <VisualPanel notebookId={id} kind="infographic" docs={docs} request={infographicRequest} onCitation={setPreview}/>}
             {view === "research" && <ResearchPanel notebookId={id} docs={docs} onImported={()=>{void load();}} onReport={reportId=>openStudio("summary",reportId)} onSource={document_id=>setPreview({document_id,filename:docs.find(d=>d.id===document_id)?.filename||"网页正文"})} onPaste={()=>setAdding(true)} onAsk={(text,source_ids)=>{if(generating){setError("请先停止当前回答");return;}setView("chat");setSelected(source_ids);generate(undefined,{question:`请围绕研究问题“${text}”解释所选原始资料的主要证据与尚不确定之处。`,source_ids});}}/>}
@@ -576,6 +554,7 @@ export default function Workspace({
             )}
             {view === "learning" && (
               <LearningPanel
+                onFocusChange={setQuizFocused}
                 onDirtyChange={reportLearningDirty}
                 studioRequest={learningRequest}
                 notebookId={id}

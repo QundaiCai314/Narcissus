@@ -12,3 +12,4 @@ __pycache__/
 work/
 backups/
 frontend/public/pdfjs/
+frontend/public/mathlive/

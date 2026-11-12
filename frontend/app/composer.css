@@ -1,0 +1,613 @@
+/* Quiet, compact tools on the existing paper-and-ink palette. */
+.workspace-dialog.studio-modal {
+  inset: 0;
+  margin: auto;
+  width: min(920px, calc(100vw - 64px));
+  height: min(760px, calc(100dvh - 80px));
+  max-height: calc(100dvh - 80px);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+  box-shadow: 0 24px 80px #26352430;
+}
+.workspace-dialog.studio-modal::backdrop {
+  background: #20291e66;
+  backdrop-filter: blur(5px);
+}
+.studio-modal .studio-detail-heading {
+  padding: 16px 24px;
+  background: var(--bg);
+  flex: none;
+}
+.studio-modal-title {
+  font: 20px/1.5 var(--serif);
+  color: var(--ink);
+}
+.studio-close {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--ink-secondary);
+}
+.studio-close:hover {
+  color: var(--green);
+  background: var(--green-light);
+}
+.studio-modal .writing-heading {
+  padding: 16px 24px;
+}
+.studio-modal .writing-scroll {
+  padding: 24px;
+}
+.library-sidebar .sidebar-private {
+  justify-content: space-between;
+  font-variant-numeric: tabular-nums;
+}
+.source-history {
+  flex: none;
+  padding: 12px 0 4px;
+  border-top: 1px solid var(--line);
+}
+.source-history-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 8px;
+  min-height: 40px;
+  color: var(--ink-secondary);
+  font-size: 13px;
+  border-radius: 4px;
+}
+.source-history-trigger:hover,
+.source-history-trigger[aria-expanded="true"] {
+  background: var(--green-light);
+  color: var(--green);
+}
+.source-history-trigger small {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.history-popover {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  max-height: min(420px, calc(100dvh - 140px));
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 12px 40px #29352224;
+  overflow: auto;
+}
+.history-popover:popover-open {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.history-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.history-heading strong {
+  font: 18px var(--serif);
+}
+.history-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 8px 10px;
+  flex: none;
+}
+.history-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 13px;
+}
+.history-list {
+  overflow: auto;
+  min-height: 0;
+}
+.history-list > button {
+  width: 100%;
+  min-height: 40px;
+  padding: 10px;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+.history-list > button span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.history-list > button:hover,
+.history-list > button.active {
+  background: var(--green-light);
+  color: var(--green);
+}
+.history-more {
+  flex: none;
+  padding: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+.forum-composer .answer-editor-heading {
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+.forum-composer .answer-editor-heading small {
+  font-size: 12px;
+  color: var(--muted);
+}
+.compose-surface {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  overflow: hidden;
+}
+.compose-surface:focus-within {
+  border-color: #9ca98c;
+}
+.is-dragging .compose-surface {
+  outline: 2px dashed var(--green);
+  outline-offset: 4px;
+  background: var(--green-light);
+}
+.compose-toolbar,
+.compose-tools,
+.compose-tabs {
+  display: flex;
+  align-items: center;
+}
+.compose-toolbar {
+  padding: 6px 10px;
+  gap: 8px;
+  justify-content: space-between;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+.compose-tools {
+  gap: 2px;
+}
+.compose-icon {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink-secondary);
+}
+.compose-icon:hover:not(:disabled),
+.compose-icon[aria-expanded="true"] {
+  background: var(--green-light);
+  color: var(--green);
+}
+.compose-icon:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.compose-formula-icon {
+  font:
+    italic 22px Georgia,
+    serif;
+  gap: 1px;
+}
+.compose-formula-icon span {
+  font-size: 13px;
+}
+.compose-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--line);
+  margin: 0 6px;
+}
+.compose-tabs {
+  gap: 2px;
+}
+.compose-tabs button {
+  padding: 6px 12px;
+  min-height: 32px;
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.compose-tabs button[aria-pressed="true"] {
+  color: var(--green);
+  background: var(--green-light);
+}
+.compose-tabs button:disabled {
+  opacity: 0.4;
+}
+.forum-composer .exam-written-answer {
+  display: block;
+  margin: 0;
+}
+.study-dialog .forum-composer .exam-written-answer textarea {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 20px;
+  min-height: 200px;
+  resize: vertical;
+  box-shadow: none;
+  font-size: 16px;
+  line-height: 1.8;
+}
+.forum-composer .exam-written-answer textarea:focus {
+  outline: none;
+}
+.forum-composer .answer-preview {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 20px;
+  min-height: 200px;
+  background: transparent;
+}
+.compose-status {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.compose-palette {
+  margin: 12px;
+  max-width: 360px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--bg);
+}
+.compose-palette-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+}
+.emoji-grid button {
+  min-height: 44px;
+  font-size: 23px;
+  border-radius: 4px;
+}
+.emoji-grid button:hover {
+  background: var(--green-light);
+}
+.image-upload-panel {
+  padding: 12px 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+.image-upload-panel .button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.image-upload-panel p {
+  margin: 12px 0 4px;
+}
+.compose-error {
+  padding: 10px 12px;
+  color: #8a4634;
+  background: #fbf1e9;
+  font-size: 13px;
+  border-radius: 4px;
+}
+.forum-composer .answer-images {
+  padding: 0 16px 16px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 220px));
+}
+.forum-composer .answer-images figure {
+  padding: 8px;
+  background: var(--bg);
+}
+.forum-composer .answer-images img {
+  height: 120px;
+}
+.forum-composer .answer-images figcaption {
+  margin-top: 4px;
+  font-size: 12px;
+  gap: 4px;
+}
+.study-dialog .answer-edit-formulas summary {
+  min-height: auto;
+  padding: 8px 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.answer-edit-formulas .text-button {
+  padding: 8px;
+  margin-right: 8px;
+  font-size: 13px;
+  color: var(--green);
+}
+.formula-picker {
+  margin: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  --keyboard-zindex: 200;
+  --keyboard-toolbar-background: #f6f5ed;
+  --keyboard-background: #eceee4;
+  --keycap-background: #fffef9;
+  --keycap-text: #354230;
+  --primary: #506747;
+}
+.formula-picker-heading {
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+}
+.formula-picker-heading strong {
+  font: 18px var(--serif);
+  flex: none;
+}
+.formula-picker-heading > label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  min-width: 0;
+  color: var(--muted);
+}
+.formula-picker-heading input {
+  width: 180px;
+  min-width: 0;
+  padding: 8px;
+  border: 0;
+  background: var(--bg);
+  font-size: 13px;
+}
+.formula-browser {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  height: 248px;
+  border-bottom: 1px solid var(--line);
+}
+.formula-browser nav {
+  overflow-y: auto;
+  padding: 8px;
+  background: var(--bg);
+  border-right: 1px solid var(--line);
+}
+.formula-browser nav button {
+  display: block;
+  width: 100%;
+  min-height: 36px;
+  padding: 8px;
+  text-align: left;
+  font-size: 13px;
+  border-radius: 4px;
+}
+.formula-browser nav button[aria-pressed="true"],
+.formula-browser nav button:hover {
+  background: var(--green-light);
+  color: var(--green);
+}
+.formula-templates {
+  overflow-y: auto;
+  padding: 12px;
+  min-width: 0;
+}
+.formula-templates > p {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.formula-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 8px;
+}
+.formula-grid > button {
+  min-height: 84px;
+  min-width: 0;
+  padding: 8px 4px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper);
+  overflow: hidden;
+}
+.formula-grid > button:hover {
+  background: var(--green-light);
+  border-color: #9ca98c;
+}
+.formula-grid small {
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.study-dialog .formula-grid .katex-display {
+  margin: 4px 0;
+  padding: 0;
+  font-size: 16px;
+  overflow: hidden;
+}
+.formula-draft {
+  padding: 16px;
+}
+.formula-draft > .compose-tabs {
+  margin-bottom: 12px;
+}
+.formula-mathfield {
+  min-width: 0;
+}
+.formula-mathfield math-field {
+  display: block;
+  width: 100%;
+  min-height: 70px;
+  padding: 10px;
+  font-size: 24px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--ink);
+  --selection-background-color: #cdd8c1;
+  --caret-color: #4b6241;
+  --contains-highlight-background-color: #e9eddf;
+}
+.formula-mathfield math-field::part(menu-toggle) {
+  display: none;
+}
+.formula-draft > textarea {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font: 14px/1.6 monospace;
+}
+.formula-live-preview {
+  overflow-x: auto;
+  min-height: 60px;
+}
+.formula-draft > .muted {
+  font-size: 12px;
+  margin: 10px 0 16px;
+}
+.formula-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.formula-footer > div {
+  display: flex;
+  gap: 12px;
+  flex: 1;
+}
+.formula-footer label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.formula-footer input {
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  margin: 0;
+  accent-color: var(--green);
+}
+.formula-footer .text-button {
+  padding: 8px;
+  font-size: 13px;
+}
+@media (max-width: 680px) {
+  .workspace-dialog.studio-modal {
+    width: calc(100vw - 24px);
+    height: calc(100dvh - 32px);
+    max-height: calc(100dvh - 32px);
+    border-radius: 12px;
+  }
+  .studio-modal .studio-detail-heading {
+    padding: 12px 16px;
+  }
+  .studio-modal .writing-heading,
+  .studio-modal .writing-scroll {
+    padding: 16px;
+  }
+  .forum-composer .answer-editor-heading {
+    align-items: center;
+    gap: 8px;
+  }
+  .forum-composer .answer-editor-heading small {
+    font-size: 10px;
+  }
+  .compose-toolbar {
+    flex-wrap: wrap;
+    padding: 4px;
+  }
+  .compose-tools {
+    gap: 0;
+  }
+  .compose-icon {
+    width: 32px;
+    height: 36px;
+  }
+  .compose-divider {
+    margin: 0 2px;
+  }
+  .compose-tabs button {
+    padding: 6px 8px;
+  }
+  .formula-picker {
+    margin: 8px;
+  }
+  .formula-picker-heading {
+    padding: 8px;
+    gap: 8px;
+  }
+  .formula-picker-heading input {
+    width: 120px;
+  }
+  .formula-browser {
+    display: flex;
+    flex-direction: column;
+    height: 264px;
+  }
+  .formula-browser nav {
+    display: flex;
+    gap: 4px;
+    flex: none;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    overflow-x: auto;
+  }
+  .formula-browser nav button {
+    width: auto;
+    white-space: nowrap;
+    flex: none;
+  }
+  .formula-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .formula-draft {
+    padding: 12px;
+  }
+  .formula-footer > div {
+    flex-basis: 100%;
+  }
+  .study-dialog .forum-composer .exam-written-answer textarea,
+  .forum-composer .answer-preview {
+    padding: 16px;
+  }
+}

@@ -4,9 +4,11 @@ import { BookOpen, ArrowUpRight, LoaderCircle, LogOut } from "lucide-react";
 import { api, post } from "@/lib/api";
 import { useRouter } from "next/navigation";
 
-export function Brand() {
+export function Brand({ onNavigate }: { onNavigate?: () => boolean } = {}) {
   return (
-    <Link className="brand" href="/">
+    <Link className="brand" href="/" aria-label="Narcissus 首页" onNavigate={(event) => {
+      if (onNavigate && !onNavigate()) event.preventDefault();
+    }}>
       <span className="brand-icon">
         <BookOpen size={20} />
       </span>
