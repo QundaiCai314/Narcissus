@@ -43,8 +43,9 @@ summary 模式输出 {"overview":[内容块],"findings":[内容块],"details":[�
 用简体中文。注意用途、受众和篇幅要求。每块不超过1000字，概述避免逐字重复资料。""" + READING_RULES
 
 
-def build_evidence(db, nb, request, kind, max_sources=24, text_limit=1600):
+def build_evidence(db, nb, request, kind, max_sources=24, text_limit=1600, *, allow_embedding_fallback=False):
     """Ensure coverage across selected files before adding semantic retrieval, with a hard input cap."""
+    retrieval_mode = "document_coverage"
     docs = [db.get(Document, item["id"]) for item in request["documents"]]
     picked, seen, totals, chunks_by_document = [], set(), {}, {}
 
@@ -71,18 +72,26 @@ def build_evidence(db, nb, request, kind, max_sources=24, text_limit=1600):
             add(chunk, doc)
     if docs and kind == "summary":
         query = f"主要观点 关键数据 冲突 不确定事项 {request['purpose']} {request['audience']}"
-        vectors, _ = embed([query[:1200]])
-        for item in retrieve(db, nb.user_id, nb.id, [d.id for d in docs], vectors[0]):
-            chunk, doc = db.get(Chunk, item["chunk_id"]), db.get(Document, item["document_id"])
-            add(chunk, doc)
-            if request.get("research"):
-                # Definitions and their following exception lists must remain readable together.
-                # Keep each neighbour as a separate, independently traceable citation.
-                ordered = chunks_by_document[doc.id]
-                index = next(i for i, candidate in enumerate(ordered) if candidate.id == chunk.id)
-                for neighbour in ordered[max(0, index-1):index+5]:
-                    if len(picked) < 64:
-                        add(neighbour, doc)
+        try:
+            vectors, _ = embed([query[:1200]])
+        except ModelError:
+            if not allow_embedding_fallback:
+                raise
+            retrieval_mode = "document_coverage_fallback"
+            log.warning("Semantic retrieval unavailable; using bounded original-document coverage")
+        else:
+            retrieval_mode = "semantic_and_document_coverage"
+            for item in retrieve(db, nb.user_id, nb.id, [d.id for d in docs], vectors[0]):
+                chunk, doc = db.get(Chunk, item["chunk_id"]), db.get(Document, item["document_id"])
+                add(chunk, doc)
+                if request.get("research"):
+                    # Definitions and their following exception lists must remain readable together.
+                    # Keep each neighbour as a separate, independently traceable citation.
+                    ordered = chunks_by_document[doc.id]
+                    index = next(i for i, candidate in enumerate(ordered) if candidate.id == chunk.id)
+                    for neighbour in ordered[max(0, index-1):index+5]:
+                        if len(picked) < 64:
+                            add(neighbour, doc)
     # Put one source from each selected note into the bounded context. Notes stay explicitly unverified.
     note_sources = [
         {
@@ -104,6 +113,7 @@ def build_evidence(db, nb, request, kind, max_sources=24, text_limit=1600):
         item["label"] = i
         item["text"] = item["text"][:per_source]
     return sources, {
+        "retrieval_mode": retrieval_mode,
         "total_chunks": totals,
         "included_chunks": len(picked),
         "context_chars": sum(len(x["text"]) for x in sources),

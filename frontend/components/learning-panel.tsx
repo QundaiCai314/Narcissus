@@ -502,7 +502,7 @@ export function LearningPanel({
                   placeholder="例如：理解核心概念，掌握容易混淆的细节"
                 />
                 <div className="learning-presets">
-                  <span className="presets-label">选择一个出题方向：</span>
+                  <span className="presets-label">{kind === "quiz" ? "选择一个出题方向：" : "选择一个学习方向："}</span>
                   {[
                     "重点难点梳理与定义考查",
                     "易错点辨析与常见混淆项",
@@ -808,7 +808,7 @@ export function LearningPanel({
               >
                 <summary>
                   {row.title}
-                  <span>试卷信息与来源</span>
+                  <span>{row.kind === "quiz" ? "试卷信息与来源" : "内容信息与来源"}</span>
                 </summary>
                 <div className="learning-result-heading">
                   <span className="eyebrow">

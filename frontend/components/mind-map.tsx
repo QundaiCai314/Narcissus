@@ -137,6 +137,24 @@ export function MindMap({
       };
     });
   }
+  function toggleNode(id: string) {
+    if (!collapsed.has(id)) {
+      let current = node;
+      while (current?.parent_id) {
+        if (current.parent_id === id) {
+          setSelected(id);
+          break;
+        }
+        current = row.items?.find((item) => item.id === current?.parent_id);
+      }
+    }
+    setCollapsed((previous) => {
+      const next = new Set(previous);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
   return (
     <div className="learning-detail">
       <div className="learning-toolbar">
@@ -261,14 +279,7 @@ export function MindMap({
                       className="node-toggle"
                       aria-label={`${collapsed.has(n.node.id) ? "展开" : "折叠"}${n.node.title}`}
                       aria-expanded={!collapsed.has(n.node.id)}
-                      onClick={() =>
-                        setCollapsed((v) => {
-                          const next = new Set(v);
-                          if (next.has(n.node.id)) next.delete(n.node.id);
-                          else next.add(n.node.id);
-                          return next;
-                        })
-                      }
+                      onClick={() => toggleNode(n.node.id)}
                     >
                       {collapsed.has(n.node.id) ? "＋" : "−"}
                     </button>

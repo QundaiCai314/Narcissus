@@ -357,6 +357,7 @@ def retry(set_id: str, user=Depends(current_user), db=Depends(db_session)):
         fail(409, "source_changed", "资料已更新或删除，请选择当前资料生成新版")
     rate_limit("learning_generation:" + user.id, 30, 3600)
     row.status, row.phase, row.claim, row.attempts = "queued", "queued", None, 0
+    row.error, row.warning = None, None
     row.available_at, row.dispatched_at, row.started_at = now(), None, None
     db.commit()
     return serialize(db, row, user.id)
