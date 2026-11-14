@@ -851,3 +851,63 @@ def resolve_node(db, user_id, notebook_id, context):
         if s["state"] != "active" or not chunk or chunk.document_id != s["document_id"]:
             fail(409, "source_changed", "知识点原始依据已失效")
     return node, sources, [s["id"] for s in row.sources]
+
+
+@router.post("/learning/{set_id}/nodes/{node_id}/explanation")
+async def node_explanation(set_id: str, node_id: str, user=Depends(current_user), db=Depends(db_session)):
+    import hashlib
+    import json
+    import secrets
+    from .security import redis
+    from redis.exceptions import RedisError
+    from .model_service import ModelError
+    from .node_explanations import scope, explain
+    user_id = user.id
+
+    def prepare():
+        row = owned(db,user_id,set_id)
+        node, _, _ = resolve_node(db,user_id,row.notebook_id,{'set_id':set_id,'node_id':node_id})
+        if node.get('parent_id') is None:
+            fail(422,'choose_knowledge_node','请选择一个具体知识点查看详解')
+        nodes,sources = scope(row.result['items'],node_id,refs(db,row))
+        for source in sources:
+            chunk = db.get(Chunk,source['chunk_id'])
+            if source['state'] != 'active' or not chunk or chunk.document_id != source['document_id']:
+                fail(409,'source_changed','知识点原始依据已失效，请生成新版导图')
+        if not sources:
+            fail(409,'no_evidence','当前知识点没有可核验的原文')
+        return nodes,sources
+
+    nodes,sources = prepare()
+    key = 'node-detail:v1:' + hashlib.sha256(f'{user_id}:{set_id}:{node_id}'.encode()).hexdigest()
+    try:
+        cached = redis.get(key)
+        if cached:
+            return json.loads(cached)
+        token = secrets.token_hex(16)
+        if not redis.set(key+':lock',token,nx=True,ex=120):
+            fail(409,'detail_pending','这个知识点正在生成详解，请稍后重试')
+    except RedisError:
+        fail(503,'detail_unavailable','讲解服务暂时不可用，请稍后重试')
+    try:
+        rate_limit('node_detail:'+user_id,30,3600)
+        # The model call must not hold a database connection while it streams.
+        db.rollback()
+        detail = await explain(nodes,sources)
+        # Never publish an explanation after its source version changed.
+        db.expire_all()
+        prepare()
+        try:
+            redis.setex(key,86400,json.dumps(detail,ensure_ascii=False))
+        except RedisError:
+            logging.getLogger(__name__).warning('Node detail cache unavailable')
+        return detail
+    except ModelError as exc:
+        fail(502,'detail_failed',str(exc))
+    except TimeoutError:
+        fail(504,'detail_timeout','讲解生成超时，请稍后重试')
+    finally:
+        try:
+            redis.eval("if redis.call('GET',KEYS[1])==ARGV[1] then return redis.call('DEL',KEYS[1]) end return 0",1,key+':lock',token)
+        except RedisError:
+            logging.getLogger(__name__).warning('Node detail lock release unavailable')

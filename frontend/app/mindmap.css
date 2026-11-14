@@ -57,3 +57,10 @@
 }
 
 .mindmap-dock .node-title { padding: 6px 10px; }
+.node-detail-section { margin: 20px 0; }
+.node-detail-section h4 { margin: 0 0 8px; color: var(--green); font-size: 14px; font-weight: 600; }
+.node-detail-section .markdown-body { font-size: 14px; line-height: 1.9; }
+.node-detail-loading { color: var(--muted); padding: 8px 0 16px; }
+.node-detail-loading > div { height: 12px; margin-top: 12px; border-radius: 4px; background: var(--soft); }
+.node-detail-loading > div:last-child { width: 65%; }
+.node-detail-error { padding: 12px 0; color: var(--red); }

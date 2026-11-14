@@ -7,6 +7,7 @@ import {
   OnCitation,
 } from "@/lib/learning";
 import { ReferenceList } from "./writing-view";
+import { NodeExplanation } from "./node-explanation";
 
 type Positioned = { node: LearningItem; x: number; y: number; height: number };
 function overview(items: LearningItem[]) {
@@ -314,9 +315,10 @@ export function MindMap({
       </div>
       {node ? (
         <section className="learning-explanation">
-          <span className="eyebrow">探索知识点</span>
+          <span className="eyebrow">{node.parent_id ? "知识点详解" : "知识导航"}</span>
           <h3>{node.title}</h3>
-          <p>{node.explanation}</p>
+          {node.parent_id ? <NodeExplanation row={row} node={node} valid={valid} onCitation={onCitation}/> :
+            <p className="muted">选择导图中的具体知识点，在这里查看详细讲解与原文依据。</p>}
           <button
             className="button primary"
             disabled={!valid}
@@ -327,16 +329,16 @@ export function MindMap({
               )
             }
           >
-            围绕此知识点提问
+            继续追问这个知识点
           </button>
           {!valid && (
             <p className="muted">资料已更新或删除，请生成新版后继续提问。</p>
           )}
-          <ReferenceList
+          {!node.parent_id && <ReferenceList
             citations={row.citations || []}
             content={node.refs.map((n) => `[${n}]`).join("")}
             onCitation={onCitation}
-          />
+          />}
         </section>
       ) : (
         <p>请选择一个知识点。</p>
