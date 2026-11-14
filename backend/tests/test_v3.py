@@ -450,7 +450,7 @@ def test_structural_rejection(mutation):
     elif mutation == "orphan":
         items[0]["parent_id"] = "missing"
     elif mutation == "depth":
-        for i in range(2, 5):
+        for i in range(2, 10):
             items.append(
                 {**copy.deepcopy(BASE_ITEM), "id": f"n{i}", "parent_id": f"n{i - 1}"}
             )

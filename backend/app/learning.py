@@ -38,9 +38,9 @@ class GenerateInput(BaseModel):
         self.count = (
             self.count
             if self.count is not None
-            else {"mindmap": 40, "flashcards": 15, "quiz": 10}[self.kind]
+            else {"mindmap": 120, "flashcards": 15, "quiz": 10}[self.kind]
         )
-        low, high = {"mindmap": (1, 40), "flashcards": (10, 30), "quiz": (5, 20)}[
+        low, high = {"mindmap": (1, 120), "flashcards": (10, 30), "quiz": (5, 20)}[
             self.kind
         ]
         if not low <= self.count <= high or len(set(self.document_ids)) != len(
@@ -219,7 +219,7 @@ def enqueue(db, user, nb_id, data, previous=None):
         "audience": data.audience,
         "difficulty": data.difficulty,
         "count": data.count,
-        "max_depth": 3,
+        "max_depth": 8 if data.kind == "mindmap" else 3,
     }
     if data.kind == "quiz":
         params.update(question_types=data.question_types, study_stage=data.study_stage, subject=data.subject)

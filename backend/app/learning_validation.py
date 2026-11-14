@@ -211,8 +211,8 @@ def validate_result(raw, kind, params, sources, check_tree=True):
                 ):
                     raise ModelError("导图存在无效父节点")
                 current = nodes.get(parent)
-            if len(seen) > 3:
-                raise ModelError("导图不能超过三层，请压缩层级")
+            if len(seen) > min(params.get("max_depth", 8), 8):
+                raise ModelError("导图超出允许层级，请按资料自然组织并遵守深度上限")
     return {"items": cleaned}
 
 

@@ -9,6 +9,10 @@ import {
 import { ReferenceList } from "./writing-view";
 
 type Positioned = { node: LearningItem; x: number; y: number; height: number };
+function overview(items: LearningItem[]) {
+  const root = items.find((item) => !item.parent_id);
+  return new Set(items.filter((item) => item.parent_id && item.parent_id !== root?.id).map((item) => item.id));
+}
 export function MindMap({
   row,
   onCitation,
@@ -18,7 +22,7 @@ export function MindMap({
   onCitation: OnCitation;
   onAsk: (context: LearningContext, title: string) => void;
 }) {
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => overview(row.items || []));
   const [selected, setSelected] = useState(row.items?.[0]?.id || "");
   const [view, setView] = useState({ x: 20, y: 20, z: 1 });
   const viewport = useRef<HTMLDivElement>(null);
@@ -116,6 +120,12 @@ export function MindMap({
     return () => target.removeEventListener("wheel", handler);
   }, []);
   const node = (row.items || []).find((n) => n.id === selected);
+  const trail: LearningItem[] = [];
+  let ancestor = node;
+  while (ancestor) {
+    trail.unshift(ancestor);
+    ancestor = row.items?.find((item) => item.id === ancestor?.parent_id);
+  }
   const valid = row.sources.every((s) => s.state === "active");
   function focusNode(id: string) {
     setSelected(id);
@@ -181,10 +191,22 @@ export function MindMap({
         <button className="text-button" onClick={() => setCollapsed(new Set())}>
           展开全部
         </button>
+        <button className="text-button" onClick={() => {
+          setCollapsed(overview(row.items || []));
+          setSelected(row.items?.find((item) => !item.parent_id)?.id || "");
+        }}>
+          章节总览
+        </button>
         <span className="muted">
           {Math.round(view.z * 100)}% · 拖动画布移动
         </span>
       </div>
+      <nav aria-label="当前知识点路径" className="learning-toolbar">
+        {trail.map((item, index) => <span key={item.id}>
+          {index > 0 && <span aria-hidden="true"> / </span>}
+          <button className="text-button" onClick={() => focusNode(item.id)}>{item.title}</button>
+        </span>)}
+      </nav>
       <div className="mindmap-viewport" ref={viewport}>
         <svg
           width="100%"

@@ -216,7 +216,7 @@ export function LearningPanel({
       topic,
       audience,
       difficulty,
-      count: kind === "mindmap" ? 40 : count,
+      count: kind === "mindmap" ? 120 : count,
       ...(kind === "quiz"
         ? { question_types: quizTypes, study_stage: studyStage, subject }
         : {}),
@@ -559,7 +559,7 @@ export function LearningPanel({
                   </select>
                 </label>
                 {kind === "mindmap" ? (
-                  <p className="muted">最多 3 层、40 个节点</p>
+                  <p className="muted">按资料自然分层，可逐级展开知识点</p>
                 ) : (
                   <label>
                     {kind === "flashcards" ? "闪卡数量" : "测验题数"}
