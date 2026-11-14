@@ -1,0 +1,59 @@
+/* The map shares the notebook with its conversation, with optional in-place expansion. */
+.workspace.studio-workspace.has-mindmap-dock {
+  grid-template-columns: 200px minmax(280px, .85fr) minmax(420px, 1.4fr);
+}
+.mindmap-dock { background: var(--paper); border-radius: 8px; }
+.mindmap-dock-heading, .mindmap-dock-heading > div {
+  display: flex; align-items: center; gap: 8px;
+}
+.mindmap-dock-heading {
+  justify-content: space-between; padding: 12px 16px;
+  border-bottom: 1px solid var(--line); flex: none; color: var(--green);
+}
+.mindmap-dock-heading h2 { margin: 0; font: 500 16px/1.5 var(--serif); }
+.mindmap-dock .learning-area { min-height: 0; flex: 1; border: 0; background: transparent; }
+.mindmap-dock .learning-collection { margin: 0; padding: 8px 16px; border-bottom: 1px solid var(--line-subtle); }
+.mindmap-dock .learning-library { padding: 12px 0; }
+.mindmap-dock .learning-filters { display: none; }
+.mindmap-dock .writing-heading { padding: 16px; }
+.mindmap-dock .learning-scroll { padding: 12px 16px 24px; overflow: auto; min-height: 0; }
+.mindmap-dock .quiz-paper-details { margin-bottom: 8px; }
+.mindmap-dock .quiz-paper-details > summary {
+  display: block; overflow-wrap: anywhere; font-size: 12px;
+}
+.mindmap-dock .learning-detail > .learning-toolbar {
+  gap: 4px; flex-wrap: wrap; font-size: 12px;
+}
+.mindmap-dock .learning-toolbar .button { padding: 6px 8px; font-size: 12px; }
+.mindmap-dock .mindmap-viewport {
+  height: clamp(360px, 55dvh, 640px); border-radius: 4px;
+  background-color: var(--bg); border-color: var(--line);
+}
+.mindmap-dock .learning-explanation {
+  margin-top: 16px; border-top: 1px solid var(--line); padding-top: 16px;
+}
+.mindmap-dock .source-warning { font-size: 12px; line-height: 1.6; }
+.mindmap-dock.is-expanded {
+  position: fixed; inset: 16px; z-index: 80; width: auto; height: auto;
+  box-shadow: 0 16px 48px var(--green-glow);
+}
+.mindmap-dock.is-expanded .mindmap-viewport { height: max(420px, 65dvh); }
+@media (min-width: 1600px) {
+  .workspace.studio-workspace.has-mindmap-dock { grid-template-columns: 220px minmax(360px, .85fr) minmax(560px, 1.4fr); }
+}
+@media (min-width: 961px) and (max-width: 1120px) {
+  .workspace.studio-workspace.has-mindmap-dock { grid-template-columns: 170px minmax(260px, .8fr) minmax(360px, 1.2fr); }
+}
+@media (min-width: 681px) and (max-width: 960px) {
+  .workspace.studio-workspace.has-mindmap-dock { grid-template-columns: 200px minmax(0, 1fr); }
+  .has-mindmap-dock .mindmap-dock { grid-column: 1 / -1; min-height: 640px; }
+}
+@media (max-width: 680px) {
+  .has-mindmap-dock .mindmap-dock { flex: 1; min-height: 0; width: 100%; border: 0; }
+  .mindmap-dock.is-expanded { inset: 8px; width: auto; }
+  .workspace-shell[data-mobile-panel="chat"] .mindmap-dock,
+  .workspace-shell[data-mobile-panel="sources"] .mindmap-dock { display: none; }
+  .mindmap-dock .learning-scroll { padding: 12px; }
+}
+
+.mindmap-dock .node-title { padding: 6px 10px; }

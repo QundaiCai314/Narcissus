@@ -23,6 +23,7 @@ export function LearningPanel({
   studioRequest,
   onDirtyChange,
   onFocusChange,
+  compactMindmap = false,
 }: {
   notebookId: string;
   docs: Document[];
@@ -30,6 +31,7 @@ export function LearningPanel({
   onAsk: (context: LearningContext, title: string, sourceIds: string[]) => void;
   onDirtyChange?: (dirty: boolean) => void;
   onFocusChange?: (focused: boolean) => void;
+  compactMindmap?: boolean;
   studioRequest?: {
     key: number;
     id?: string;
@@ -272,7 +274,7 @@ export function LearningPanel({
     }
   }
   const active = row && ["queued", "running"].includes(row.status),
-    visible = items.filter((x) => filter === "all" || x.kind === filter);
+    visible = items.filter((x) => compactMindmap ? x.kind === "mindmap" : filter === "all" || x.kind === filter);
   const focusedQuiz =
     !form && row?.kind === "quiz" && row.status === "complete";
   useEffect(() => {
@@ -281,9 +283,9 @@ export function LearningPanel({
   }, [focusedQuiz, onFocusChange]);
   return (
     <section
-      className={`writing-area learning-area ${form && kind === "quiz" ? "quiz-planning" : row?.kind === "quiz" ? "quiz-reading" : ""}`}
+      className={`writing-area learning-area ${compactMindmap ? "mindmap-learning" : ""} ${form && kind === "quiz" ? "quiz-planning" : row?.kind === "quiz" ? "quiz-reading" : ""}`}
     >
-      {!focusedQuiz && (
+      {!focusedQuiz && !(compactMindmap && row && !form) && (
         <div className="writing-heading">
           <div>
             <span className="eyebrow">从理解，到掌握</span>
@@ -336,7 +338,7 @@ export function LearningPanel({
                 ["mindmap", "思维导图"],
                 ["flashcards", "闪卡"],
                 ["quiz", "测验"],
-              ].map(([value, label]) => (
+              ].filter(([value]) => !compactMindmap || value === "mindmap").map(([value, label]) => (
                 <button
                   key={value}
                   className={filter === value ? "active" : ""}
@@ -429,7 +431,7 @@ export function LearningPanel({
                     setCount(k === "quiz" ? 10 : 15);
                   }}
                 >
-                  {Object.entries(kindNames).map(([value, name]) => (
+                  {Object.entries(kindNames).filter(([value]) => !compactMindmap || value === "mindmap").map(([value, name]) => (
                     <option key={value} value={value}>
                       {name}
                     </option>
@@ -804,7 +806,7 @@ export function LearningPanel({
             {!focusedQuiz && (
               <details
                 className="quiz-paper-details"
-                open={row.kind !== "quiz" || row.status !== "complete"}
+                open={row.status !== "complete" || (!compactMindmap && row.kind !== "quiz")}
               >
                 <summary>
                   {row.title}
@@ -881,12 +883,13 @@ export function LearningPanel({
                       {row.error}
                     </p>
                   )}
-                  {row.warning && (
+                  {row.warning && !compactMindmap && (
                     <p className="source-warning">{row.warning}</p>
                   )}
                 </div>
               </details>
             )}
+            {compactMindmap && row.warning && <p className="source-warning">{row.warning}</p>}
             {active && (
               <div className="learning-pending">
                 <div className="learning-pulse" />
@@ -935,7 +938,7 @@ export function LearningPanel({
             <h3>梳理知识，主动回想，检验理解。</h3>
             <p>从一份或多份资料开始，生成可以追溯原文的学习内容。</p>
             <div className="learning-type-cards">
-              {Object.entries(kindNames).map(([k, name]) => (
+              {Object.entries(kindNames).filter(([value]) => !compactMindmap || value === "mindmap").map(([k, name]) => (
                 <button
                   key={k}
                   onClick={() => {

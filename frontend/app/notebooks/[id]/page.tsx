@@ -37,6 +37,7 @@ import { GuidePanel } from "@/components/guide-panel";
 import { WritingPanel } from "@/components/writing-panel";
 import { AudioPanel } from "@/components/audio-panel";
 import { ConversationHistory } from "@/components/conversation-history";
+import { MindmapDock } from "@/components/mindmap-dock";
 import { LearningPanel } from "@/components/learning-panel";
 import { VisualPanel } from "@/components/visual-panel";
 import { ResearchPanel } from "@/components/research-panel";
@@ -76,6 +77,8 @@ export default function Workspace({
   const [infographicRequest, setInfographicRequest] = useState<StudioRequest>();
   const [learningRequest, setLearningRequest] = useState<StudioRequest>();
   const [quizFocused, setQuizFocused] = useState(false);
+  const [mindmapExpanded, setMindmapExpanded] = useState(false);
+  const dockedMindmap = view === "learning" && learningRequest?.kind === "mindmap";
   const learningDirty = useRef(false);
   const reportLearningDirty = useCallback((dirty: boolean) => { learningDirty.current = dirty; }, []);
   const {
@@ -135,6 +138,7 @@ export default function Workspace({
       setAudioRequest(request); setView("audio");
     } else {
       setLearningRequest({ ...request, kind }); setView("learning");
+      if (kind === "mindmap") setMobilePanel("studio");
     }
     if (pushState && typeof window !== "undefined") {
       const q = new URLSearchParams(window.location.search);
@@ -148,6 +152,8 @@ export default function Workspace({
   function closeStudio(pushState: boolean = true) {
     if (learningDirty.current && !window.confirm("当前作答尚未保存，离开会放弃这些修改。仍要离开吗？")) return;
     setView("chat");
+    setMindmapExpanded(false);
+    setMobilePanel("chat");
     if (pushState && typeof window !== "undefined") {
       const q = new URLSearchParams(window.location.search);
       q.delete("tab");
@@ -198,6 +204,32 @@ export default function Workspace({
         </main>
       </>
     );
+  const learningContent = (
+              <LearningPanel
+                compactMindmap={dockedMindmap}
+                onFocusChange={setQuizFocused}
+                onDirtyChange={reportLearningDirty}
+                studioRequest={learningRequest}
+                notebookId={id}
+                docs={docs}
+                onCitation={setPreview}
+                onAsk={(context, title, sourceIds) => {
+                  if (generating) {
+                    setError("请先停止当前回答，再开始提问");
+                    return;
+                  }
+                  if (!dockedMindmap) setView("chat");
+                  setMindmapExpanded(false);
+                  setMobilePanel("chat");
+                  setSelected(sourceIds);
+                  generate(undefined, {
+                    question: `请依据资料解释“${title}”，说明关键依据和容易混淆的地方。`,
+                    learning_context: context,
+                    source_ids: sourceIds,
+                  });
+                }}
+              />
+  );
   return (
     <div className="workspace-shell" data-mobile-panel={mobilePanel}>
       <Header>
@@ -232,7 +264,7 @@ export default function Workspace({
         <button aria-pressed={mobilePanel === "chat"} onClick={() => setMobilePanel("chat")}>对话</button>
         <button aria-pressed={mobilePanel === "studio"} onClick={() => setMobilePanel("studio")}>创作</button>
       </nav>
-      <main className="workspace studio-workspace">
+      <main className={`workspace studio-workspace ${dockedMindmap ? "has-mindmap-dock" : ""}`}>
         <aside className="sources-panel">
           <div className="panel-title">
             <h2>
@@ -492,16 +524,18 @@ export default function Workspace({
             </form>
           </div>
         </section>
-        <StudioPanel
+        {dockedMindmap ? <MindmapDock expanded={mindmapExpanded} onExpand={setMindmapExpanded} onClose={() => closeStudio()}>
+          {learningContent}
+        </MindmapDock> : <StudioPanel
           notebookId={id}
           revision={`${view}:${noteId}:${summaryId}:${studioTick}`}
           selectedCount={chosenSources.length}
           onCreate={openStudio}
           onOpen={openStudio}
-        />
+        />}
       </main>
-      <WorkspaceDialog className={view === "learning" ? `study-dialog ${quizFocused ? "quiz-focus" : "studio-modal"}` : "studio-modal"} open={view !== "chat"} label="工作室内容" onClose={() => closeStudio()}>
-        {view !== "chat" && (
+      <WorkspaceDialog className={view === "learning" ? `study-dialog ${quizFocused ? "quiz-focus" : "studio-modal"}` : "studio-modal"} open={view !== "chat" && !dockedMindmap} label="工作室内容" onClose={() => closeStudio()}>
+        {view !== "chat" && !dockedMindmap && (
           <>
             <div className="studio-detail-heading">
               {view === "learning" && quizFocused ? <Brand onNavigate={() => !learningDirty.current || window.confirm("当前作答尚未保存，返回主页会放弃这些修改。仍要离开吗？")} /> : <span className="studio-modal-title">{{ presentation:"演示文稿", infographic:"信息图", research: "联网研究", guide: "资料导读", note: "笔记", summary: "总结", learning: "主动学习", audio: "音频概览", chat: "对话" }[view]}</span>}
@@ -552,29 +586,7 @@ export default function Workspace({
                 onCitation={setPreview}
               />
             )}
-            {view === "learning" && (
-              <LearningPanel
-                onFocusChange={setQuizFocused}
-                onDirtyChange={reportLearningDirty}
-                studioRequest={learningRequest}
-                notebookId={id}
-                docs={docs}
-                onCitation={setPreview}
-                onAsk={(context, title, sourceIds) => {
-                  if (generating) {
-                    setError("请先停止当前回答，再开始提问");
-                    return;
-                  }
-                  setView("chat");
-                  setSelected(sourceIds);
-                  generate(undefined, {
-                    question: `请依据资料解释“${title}”，说明关键依据和容易混淆的地方。`,
-                    learning_context: context,
-                    source_ids: sourceIds,
-                  });
-                }}
-              />
-            )}
+            {view === "learning" && learningContent}
             {view === "audio" && <AudioPanel notebookId={id} docs={docs} studioRequest={audioRequest} onCitation={setPreview}/>}
           </>
         )}

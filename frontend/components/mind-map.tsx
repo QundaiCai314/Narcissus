@@ -11,7 +11,7 @@ import { ReferenceList } from "./writing-view";
 type Positioned = { node: LearningItem; x: number; y: number; height: number };
 function overview(items: LearningItem[]) {
   const root = items.find((item) => !item.parent_id);
-  return new Set(items.filter((item) => item.parent_id && item.parent_id !== root?.id).map((item) => item.id));
+  return new Set(items.filter((item) => item.parent_id && (items.length > 24 || item.parent_id !== root?.id)).map((item) => item.id));
 }
 export function MindMap({
   row,
@@ -39,13 +39,13 @@ export function MindMap({
     const nodes: Positioned[] = [];
     const heights = new Map<string, number>();
     const height = (n: LearningItem) =>
-      Math.max(76, Math.ceil((n.title || "").length / 12) * 24 + 30);
+      Math.max(44, Math.ceil((n.title || "").length / 12) * 24 + 16);
     function measure(n: LearningItem): number {
       const kids = collapsed.has(n.id) ? [] : children.get(n.id) || [];
       const h = Math.max(
         height(n),
         kids.reduce((sum, k) => sum + measure(k), 0) +
-          Math.max(0, kids.length - 1) * 24,
+          Math.max(0, kids.length - 1) * 16,
       );
       heights.set(n.id, h);
       return h;
@@ -62,7 +62,7 @@ export function MindMap({
       if (!collapsed.has(n.id))
         for (const c of children.get(n.id) || []) {
           place(c, depth + 1, offset);
-          offset += (heights.get(c.id) || 76) + 24;
+          offset += (heights.get(c.id) || 44) + 16;
         }
     }
     const root = all.find((n) => !n.parent_id);
@@ -82,11 +82,11 @@ export function MindMap({
     if (!w) return;
     const z = Math.max(
       0.12,
-      Math.min(1.2, (w - 24) / layout.width, 400 / layout.height),
+      Math.min(1.2, (w - 24) / layout.width, ((viewport.current?.clientHeight || 430) - 30) / layout.height),
     );
     setView({
       x: (w - layout.width * z) / 2,
-      y: (430 - layout.height * z) / 2,
+      y: ((viewport.current?.clientHeight || 430) - layout.height * z) / 2,
       z,
     });
   }, [layout.width, layout.height]);
@@ -112,7 +112,7 @@ export function MindMap({
         return {
           z,
           x: w / 2 - ((w / 2 - v.x) * z) / v.z,
-          y: 215 - ((215 - v.y) * z) / v.z,
+          y: (target.clientHeight / 2) - (((target.clientHeight / 2) - v.y) * z) / v.z,
         };
       });
     };
@@ -133,7 +133,7 @@ export function MindMap({
     if (item) setView({
       z: 1,
       x: (viewport.current?.clientWidth || 600) / 2 - item.x - 110,
-      y: 215 - item.y - item.height / 2,
+      y: (viewport.current?.clientHeight || 430) / 2 - item.y - item.height / 2,
     });
   }
   function zoom(factor: number) {
@@ -143,7 +143,7 @@ export function MindMap({
       return {
         z,
         x: w / 2 - ((w / 2 - v.x) * z) / v.z,
-        y: 215 - ((215 - v.y) * z) / v.z,
+        y: (viewport.current?.clientHeight || 430) / 2 - (((viewport.current?.clientHeight || 430) / 2 - v.y) * z) / v.z,
       };
     });
   }
@@ -210,7 +210,7 @@ export function MindMap({
       <div className="mindmap-viewport" ref={viewport}>
         <svg
           width="100%"
-          height="430"
+          height="100%"
           tabIndex={0}
           role="group"
           aria-label="知识导图画布"
