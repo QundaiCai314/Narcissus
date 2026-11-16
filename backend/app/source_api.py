@@ -1,7 +1,7 @@
 """Owned sources, candidate edits and immutable historical previews."""
 import re
 from pathlib import PurePosixPath
-from fastapi import APIRouter, Depends, UploadFile, File, Query, Request, Response
+from fastapi import APIRouter, Depends, UploadFile, File, Form, Query, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 from .db import db_session
@@ -16,6 +16,36 @@ from .source_parsing import digest, text_units, make_chunks
 from .pdf_processing import InvalidPDF
 
 router = APIRouter(tags=["资料"])
+
+
+@router.post('/notebooks/{notebook_id}/outline-preview')
+def outline_preview(notebook_id: str, file: UploadFile = File(...), pages: str = Form(''),
+                    user=Depends(current_user), db=Depends(db_session)):
+    from . import outline_jobs
+    access.notebook(db,user.id,notebook_id)
+    rate_limit('outline-preview:'+user.id,20,3600)
+    if not (file.filename or '').lower().endswith('.pdf'):
+        fail(422,'pdf_required','目录识别仅支持PDF')
+    raw=file.file.read(settings().max_upload_mb*1024*1024+1)
+    if len(raw)>settings().max_upload_mb*1024*1024:
+        fail(413,'too_large','PDF文件超过大小限制')
+    if not raw.startswith(b'%PDF-'):
+        fail(422,'invalid_pdf','文件不是有效的PDF')
+    # Preview never reserves a Document, uploads an object or enqueues indexing.
+    try:
+        return outline_jobs.start(raw,pages,user.id,notebook_id)
+    except RuntimeError as exc:
+        fail(429,'outline_busy',str(exc))
+
+
+@router.get('/notebooks/{notebook_id}/outline-preview/{job_id}')
+def outline_preview_status(notebook_id:str,job_id:str,user=Depends(current_user),db=Depends(db_session)):
+    from . import outline_jobs
+    access.notebook(db,user.id,notebook_id)
+    result=outline_jobs.lookup(job_id,user.id,notebook_id)
+    if result is None:fail(404,'outline_missing','目录预览已过期或服务已重启，请重新识别')
+    return result
+
 EXTENSIONS = {".pdf": "pdf", ".docx": "docx", ".txt": "text", ".md": "markdown", ".markdown": "markdown", ".png": "image", ".jpg": "image", ".jpeg": "image"}
 MIMES = {"pdf": "application/pdf", "image": "image/png", "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text": "text/plain", "markdown": "text/plain", "paste": "text/plain", "web": "text/plain"}
 

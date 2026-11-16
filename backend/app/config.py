@@ -70,6 +70,7 @@ class Settings(BaseSettings):
     ocr_max_pages: int = 30
     ocr_page_timeout_seconds: int = 30
     ocr_total_timeout_seconds: int = 160
+    outline_timeout_seconds: int = 600
     tts_api_key: str = ""
     tts_base_url: str = "https://api.stepfun.com/v1"
     tts_model: str = "step-tts-mini"

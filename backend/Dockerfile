@@ -8,7 +8,7 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources && apt-get -o Acquire::Retries=3 update && apt-get -o Acquire::Retries=3 install -y --no-install-recommends poppler-utils tesseract-ocr tesseract-ocr-chi-sim fonts-noto-cjk libcairo2 nodejs && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt && useradd --create-home app
+RUN pip install --no-cache-dir -r requirements.txt && pip uninstall -y opencv-python && pip install --no-cache-dir opencv-python-headless==4.13.0.92 && useradd --create-home app
 COPY --from=renderer-deps /renderer/node_modules ./renderer/node_modules
 COPY . .
 USER app
