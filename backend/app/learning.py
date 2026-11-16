@@ -15,6 +15,7 @@ from .errors import fail
 from .models import LearningSet, CardProgress, QuizAttempt, Document, Chunk, now, uid
 from .security import current_user, rate_limit
 from .writings import source_state
+from .directory_maps import DirectoryMapInput, build as build_directory_map
 
 router = APIRouter(tags=["学习"])
 ACTIVE = ("queued", "running")
@@ -203,7 +204,37 @@ def serialize(db, row, user_id, full=False):
                 card_items(row) if row.kind == "flashcards" else row.result["items"]
             )
             data["citations"] = refs(db, row)
+            if row.params.get('origin')=='outline':data['outline']=row.result.get('outline')
     return data
+
+
+@router.post('/notebooks/{notebook_id}/outline-map/preview')
+def preview_directory_map(notebook_id:str,data:DirectoryMapInput,user=Depends(current_user),db=Depends(db_session)):
+    access.notebook(db,user.id,notebook_id)
+    try:return build_directory_map(data)
+    except ValueError as exc:fail(422,'invalid_directory',str(exc))
+
+
+@router.post('/notebooks/{notebook_id}/outline-map',status_code=201)
+def save_directory_map(notebook_id:str,data:DirectoryMapInput,user=Depends(current_user),db=Depends(db_session)):
+    nb=access.notebook(db,user.id,notebook_id,lock=True)
+    try:compiled=build_directory_map(data)
+    except ValueError as exc:fail(422,'invalid_directory',str(exc))
+    if not data.confirmed or compiled['outline']['review_pending']:
+        fail(422,'directory_unreviewed','请核对所有标记条目并确认目录层级后保存')
+    existing=db.scalar(select(LearningSet).where(LearningSet.notebook_id==notebook_id,LearningSet.request_key==str(data.request_key)))
+    if existing:
+        if existing.params.get('outline_fingerprint')!=compiled['fingerprint']:
+            fail(409,'key_reused','请求编号已用于不同目录，请重新预览')
+        return serialize(db,existing,user.id,True)
+    rate_limit('outline_save:'+user.id,30,3600)
+    row=LearningSet(id=uid(),notebook_id=notebook_id,family_id=uid(),version=1,request_key=str(data.request_key),
+        kind='mindmap',title=(data.title.strip()+' · 目录导图')[:120],
+        params=dict(origin='outline',outline_fingerprint=compiled['fingerprint'],topic=data.title.strip(),audience='',difficulty='standard',count=len(compiled['items'])),
+        sources=[],status='complete',phase='complete',result=dict(items=compiled['items'],outline=compiled['outline']),citations=[],
+        model=None,attempts=0,completed_at=now(),warning='目录导图仅表示教材结构；尚未导入正文，节点不包含知识点讲解。')
+    db.add(row);nb.updated_at=now();db.commit();db.refresh(row)
+    return serialize(db,row,user.id,True)
 
 
 def enqueue(db, user, nb_id, data, previous=None):
@@ -325,6 +356,7 @@ def regenerate(
     set_id: str, data: RequestKey, user=Depends(current_user), db=Depends(db_session)
 ):
     row = owned(db, user.id, set_id, True)
+    if row.params.get('origin')=='outline':fail(409,'directory_only','请在目录核对中修改并保存新的目录导图')
     value = GenerateInput(
         kind=row.kind,
         document_ids=[s["id"] for s in row.sources],
@@ -351,6 +383,7 @@ def cancel(set_id: str, user=Depends(current_user), db=Depends(db_session)):
 @router.post("/learning/{set_id}/retry", status_code=202)
 def retry(set_id: str, user=Depends(current_user), db=Depends(db_session)):
     row = owned(db, user.id, set_id, True)
+    if row.params.get('origin')=='outline':fail(409,'directory_only','目录导图不需要模型生成，请回到目录核对')
     if row.status not in ("failed", "cancelled"):
         fail(409, "not_retryable", "只有失败或取消的任务可以重试")
     if not valid_sources(db, row):
@@ -840,6 +873,7 @@ def resolve_node(db, user_id, notebook_id, context):
     require_complete(row, "mindmap")
     if row.notebook_id != notebook_id:
         fail(404, "not_found", "知识点不属于当前笔记本")
+    if row.params.get('origin')=='outline':fail(409,'directory_only','当前仅有目录结构，请导入正文后再生成知识点讲解')
     node = next((n for n in row.result["items"] if n["id"] == context["node_id"]), None)
     if not node:
         fail(404, "not_found", "知识点不存在")

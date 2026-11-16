@@ -9,10 +9,10 @@ import {
 import { ReferenceList } from "./writing-view";
 import { NodeExplanation } from "./node-explanation";
 
-type Positioned = { node: LearningItem; x: number; y: number; height: number };
+import {layoutMindmap,mindmapSvg,revealPath} from '@/lib/mindmap-layout';
 function overview(items: LearningItem[]) {
   const root = items.find((item) => !item.parent_id);
-  return new Set(items.filter((item) => item.parent_id && (items.length > 24 || item.parent_id !== root?.id)).map((item) => item.id));
+  return new Set(items.filter((item) => item.parent_id && item.directory?.kind!=='part' && (items.length > 24 || item.parent_id !== root?.id)).map((item) => item.id));
 }
 export function MindMap({
   row,
@@ -30,67 +30,27 @@ export function MindMap({
   const drag = useRef<{ x: number; y: number; vx: number; vy: number } | null>(
     null,
   );
-  const layout = useMemo(() => {
-    const all = row.items || [],
-      children = new Map<string, LearningItem[]>();
-    all.forEach((n) => {
-      if (n.parent_id)
-        children.set(n.parent_id, [...(children.get(n.parent_id) || []), n]);
-    });
-    const nodes: Positioned[] = [];
-    const heights = new Map<string, number>();
-    const height = (n: LearningItem) =>
-      Math.max(44, Math.ceil((n.title || "").length / 12) * 24 + 16);
-    function measure(n: LearningItem): number {
-      const kids = collapsed.has(n.id) ? [] : children.get(n.id) || [];
-      const h = Math.max(
-        height(n),
-        kids.reduce((sum, k) => sum + measure(k), 0) +
-          Math.max(0, kids.length - 1) * 16,
-      );
-      heights.set(n.id, h);
-      return h;
-    }
-    function place(n: LearningItem, depth: number, top: number) {
-      const h = heights.get(n.id) || 76;
-      nodes.push({
-        node: n,
-        x: 20 + depth * 292,
-        y: top + h / 2 - height(n) / 2,
-        height: height(n),
-      });
-      let offset = top;
-      if (!collapsed.has(n.id))
-        for (const c of children.get(n.id) || []) {
-          place(c, depth + 1, offset);
-          offset += (heights.get(c.id) || 44) + 16;
-        }
-    }
-    const root = all.find((n) => !n.parent_id);
-    if (root) {
-      measure(root);
-      place(root, 0, 20);
-    }
-    return {
-      nodes,
-      children,
-      width: Math.max(280, ...nodes.map((n) => n.x + 240)),
-      height: Math.max(180, ...nodes.map((n) => n.y + n.height + 20)),
-    };
-  }, [row.items, collapsed]);
+  const layout=useMemo(()=>layoutMindmap(row.items||[],collapsed),[row.items,collapsed]);
+  const [query,setQuery]=useState(''),[pendingFocus,setPendingFocus]=useState<string|null>(null);
+  const focusTarget=useRef<string|null>(null);
+  const layoutRef=useRef(layout);layoutRef.current=layout;
+  const directoryOnly=row.params.origin==='outline';
   const fit = useCallback(() => {
     const w = viewport.current?.clientWidth || 0;
     if (!w) return;
+    const current=layoutRef.current;
+    const focused=current.nodes.find(item=>item.node.id===focusTarget.current);
+    if(focused){setView({z:1,x:w/2-focused.x-110,y:(viewport.current?.clientHeight||430)/2-focused.y-focused.height/2});return;}
     const z = Math.max(
       0.12,
-      Math.min(1.2, (w - 24) / layout.width, ((viewport.current?.clientHeight || 430) - 30) / layout.height),
+      Math.min(1.2, (w - 24) / current.width, ((viewport.current?.clientHeight || 430) - 30) / current.height),
     );
     setView({
-      x: (w - layout.width * z) / 2,
-      y: ((viewport.current?.clientHeight || 430) - layout.height * z) / 2,
+      x: (w - current.width * z) / 2,
+      y: ((viewport.current?.clientHeight || 430) - current.height * z) / 2,
       z,
     });
-  }, [layout.width, layout.height]);
+  }, [layout.width,layout.height]);
   useEffect(() => {
     const target = viewport.current;
     if (!target) return;
@@ -104,6 +64,7 @@ export function MindMap({
     if (!target) return;
     const handler = (e: WheelEvent) => {
       e.preventDefault();
+      focusTarget.current=null;
       const w = target.clientWidth;
       setView((v) => {
         const z = Math.max(
@@ -130,14 +91,24 @@ export function MindMap({
   const valid = row.sources.every((s) => s.state === "active");
   function focusNode(id: string) {
     setSelected(id);
-    const item = layout.nodes.find((n) => n.node.id === id);
-    if (item) setView({
-      z: 1,
-      x: (viewport.current?.clientWidth || 600) / 2 - item.x - 110,
-      y: (viewport.current?.clientHeight || 430) / 2 - item.y - item.height / 2,
-    });
+    focusTarget.current=id;
+    setCollapsed(previous=>revealPath(row.items||[],id,previous));
+    setPendingFocus(id);
+  }
+  useEffect(()=>{
+    if(!pendingFocus||!layout.nodes.some(item=>item.node.id===pendingFocus))return;
+    fit();setPendingFocus(null);
+  },[pendingFocus,layout.nodes,fit]);
+  function download(format:'json'|'svg') {
+    const styles=getComputedStyle(document.documentElement);
+    const colors={paper:styles.getPropertyValue('--paper').trim(),ink:styles.getPropertyValue('--ink').trim(),line:styles.getPropertyValue('--line').trim(),accent:styles.getPropertyValue('--green').trim()};
+    const directoryEntries=directoryOnly?(row.items||[]).filter(item=>item.directory).map(item=>({...item.directory,id:item.id,parent_id:item.parent_id==='__outline_root__'?null:item.parent_id})):undefined;
+    const content=format==='svg'?mindmapSvg(row.items||[],row.title,colors):JSON.stringify({title:row.title,items:row.items,outline:row.outline,entries:directoryEntries,source_name:row.outline?.source_name,pages_read:row.outline?.pages_read,unparsed_lines:[],warnings:[]},null,2);
+    const url=URL.createObjectURL(new Blob([content],{type:format==='svg'?'image/svg+xml;charset=utf-8':'application/json;charset=utf-8'}));
+    const link=document.createElement('a');link.href=url;link.download=`narcissus-mindmap.${format}`;link.click();URL.revokeObjectURL(url);
   }
   function zoom(factor: number) {
+    focusTarget.current=null;
     const w = viewport.current?.clientWidth || 600;
     setView((v) => {
       const z = Math.max(0.12, Math.min(2.5, v.z * factor));
@@ -149,6 +120,7 @@ export function MindMap({
     });
   }
   function toggleNode(id: string) {
+    focusTarget.current=null;
     if (!collapsed.has(id)) {
       let current = node;
       while (current?.parent_id) {
@@ -168,6 +140,7 @@ export function MindMap({
   }
   return (
     <div className="learning-detail">
+      {row.outline&&<p className="muted" role="status">目录覆盖 {row.outline.covered_entries} / {row.outline.entry_count} 项 · {row.outline.chapter_count} 章 · {row.outline.directory_depth} 层目录（含书名导航共 {row.outline.map_depth} 层） · 大模型调用 0 次</p>}
       <div className="learning-toolbar">
         <button
           className="button"
@@ -183,16 +156,17 @@ export function MindMap({
         >
           −
         </button>
-        <button className="button" onClick={fit}>
+        <button className="button" onClick={()=>{focusTarget.current=null;fit();}}>
           适应屏幕
         </button>
         <button className="button" onClick={() => focusNode(selected)}>
           实际大小
         </button>
-        <button className="text-button" onClick={() => setCollapsed(new Set())}>
+        <button className="text-button" onClick={() => {focusTarget.current=null;setCollapsed(new Set());}}>
           展开全部
         </button>
         <button className="text-button" onClick={() => {
+          focusTarget.current=null;
           setCollapsed(overview(row.items || []));
           setSelected(row.items?.find((item) => !item.parent_id)?.id || "");
         }}>
@@ -201,6 +175,14 @@ export function MindMap({
         <span className="muted">
           {Math.round(view.z * 100)}% · 拖动画布移动
         </span>
+        <button className="text-button" onClick={()=>download('svg')}>下载完整SVG</button>
+        <button className="text-button" onClick={()=>download('json')}>下载导图JSON</button>
+      </div>
+      <div className="mindmap-search">
+        <input aria-label="搜索导图节点" placeholder="搜索章节或知识点…" value={query} onChange={event=>setQuery(event.target.value)}/>
+        {query.trim()&&<div aria-label="节点搜索结果">{(row.items||[]).filter(item=>(item.title||'').toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())).slice(0,20).map(item=><button className="text-button" key={item.id} onClick={()=>{focusNode(item.id);setQuery('');}}>{item.title}</button>)}
+          {!(row.items||[]).some(item=>(item.title||'').toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))&&<p className="muted">未找到匹配节点</p>}
+        </div>}
       </div>
       <nav aria-label="当前知识点路径" className="learning-toolbar">
         {trail.map((item, index) => <span key={item.id}>
@@ -242,6 +224,7 @@ export function MindMap({
           }}
           onPointerDown={(e) => {
             if ((e.target as Element).closest("button")) return;
+            focusTarget.current=null;
             drag.current = {
               x: e.clientX,
               y: e.clientY,
@@ -315,11 +298,14 @@ export function MindMap({
       </div>
       {node ? (
         <section className="learning-explanation">
-          <span className="eyebrow">{node.parent_id ? "知识点详解" : "知识导航"}</span>
+          <span className="eyebrow">{directoryOnly?'目录位置':node.parent_id ? "知识点详解" : "知识导航"}</span>
           <h3>{node.title}</h3>
-          {node.parent_id ? <NodeExplanation row={row} node={node} valid={valid} onCitation={onCitation}/> :
+          {directoryOnly?<>
+            <p className="muted">{row.outline?.source_name}{node.directory?.toc_pdf_page?` · 目录位于PDF第${node.directory.toc_pdf_page}页`:''}{node.directory?.printed_page?` · 书内第${node.directory.printed_page}页`:''}{node.directory?.target_pdf_page?` · PDF正文第${node.directory.target_pdf_page}页`:''}</p>
+            <p className="muted">当前仅有目录结构，尚未读取正文。书内印刷页码不直接作为PDF跳转位置。</p>
+          </>:node.parent_id ? <NodeExplanation row={row} node={node} valid={valid} onCitation={onCitation}/> :
             <p className="muted">选择导图中的具体知识点，在这里查看详细讲解与原文依据。</p>}
-          <button
+          {!directoryOnly&&<button
             className="button primary"
             disabled={!valid}
             onClick={() =>
@@ -330,11 +316,11 @@ export function MindMap({
             }
           >
             继续追问这个知识点
-          </button>
+          </button>}
           {!valid && (
             <p className="muted">资料已更新或删除，请生成新版后继续提问。</p>
           )}
-          {!node.parent_id && <ReferenceList
+          {!directoryOnly&&!node.parent_id && <ReferenceList
             citations={row.citations || []}
             content={node.refs.map((n) => `[${n}]`).join("")}
             onCitation={onCitation}

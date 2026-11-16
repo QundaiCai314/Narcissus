@@ -33,7 +33,7 @@ def outline_preview(notebook_id: str, file: UploadFile = File(...), pages: str =
         fail(422,'invalid_pdf','文件不是有效的PDF')
     # Preview never reserves a Document, uploads an object or enqueues indexing.
     try:
-        return outline_jobs.start(raw,pages,user.id,notebook_id)
+        return outline_jobs.start(raw,pages,user.id,notebook_id,(file.filename or '')[:240])
     except RuntimeError as exc:
         fail(429,'outline_busy',str(exc))
 

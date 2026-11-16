@@ -819,7 +819,7 @@ export function LearningPanel({
                   <h3>{row.title}</h3>
                   <p className="muted">
                     {new Date(row.created_at).toLocaleString("zh-CN")} ·{" "}
-                    {row.sources.length} 份资料
+                    {row.outline?row.outline.source_name:`${row.sources.length} 份资料`}
                     {row.status === "complete"
                       ? ` · ${row.count} ${row.kind === "mindmap" ? "个节点" : row.kind === "flashcards" ? "张卡片" : "道题"}`
                       : ""}
@@ -859,6 +859,7 @@ export function LearningPanel({
                           className="button"
                           disabled={
                             busy ||
+                            row.params.origin==='outline' ||
                             row.sources.some((s) => s.state === "deleted")
                           }
                           onClick={() => task("regenerate")}

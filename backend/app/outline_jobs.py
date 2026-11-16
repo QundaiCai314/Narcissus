@@ -11,7 +11,7 @@ _lock=threading.Lock()
 _jobs={}
 
 
-def start(data,pages,owner,notebook):
+def start(data,pages,owner,notebook,source_name=''):
     if not _slot.acquire(blocking=False):raise RuntimeError('目录识别正在进行，请完成后再试')
     ident=str(uuid.uuid4());now=time.monotonic()
     with _lock:
@@ -23,6 +23,7 @@ def start(data,pages,owner,notebook):
     def work():
         try:
             result=preview(data,pages,progress=progress)
+            result['source_name']=source_name
             with _lock:_jobs[ident].update(status='done',result=result,completed_pages=len(result['ocr_pages']))
         except ValueError as exc:
             with _lock:_jobs[ident].update(status='error',error=str(exc))

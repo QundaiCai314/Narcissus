@@ -67,5 +67,15 @@
 .outline-entries { list-style: none; padding: 0; }
 .outline-entries li { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
 .outline-number { font-size: 12px; color: var(--green); }
-.outline-entries input { flex: 1; min-width: 160px; }
+.outline-entries > li > input { flex: 1; min-width: 160px; }
 .outline-entries small { color: var(--muted); }
+.outline-map-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 16px 0; }
+.outline-map-settings .button { justify-self: start; }
+.outline-entries .outline-page { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+.outline-page input { width: 80px; min-width: 0; }
+.outline-entries label:has(input[type="checkbox"]) { display: flex; align-items: center; gap: 4px; font-size: 12px; }
+.mindmap-search { margin: 12px 0; }
+.mindmap-search > input { width: 100%; }
+.mindmap-search > div { display: grid; gap: 4px; padding: 8px 0; max-height: 240px; overflow: auto; }
+.mindmap-search .text-button { text-align: start; }
+@media(max-width:680px) { .outline-map-settings { grid-template-columns: minmax(0,1fr); } }
