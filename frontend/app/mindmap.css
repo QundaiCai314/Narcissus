@@ -78,4 +78,11 @@
 .mindmap-search > input { width: 100%; }
 .mindmap-search > div { display: grid; gap: 4px; padding: 8px 0; max-height: 240px; overflow: auto; }
 .mindmap-search .text-button { text-align: start; }
+.directory-coverage { margin: 12px 0; padding: 12px; background: var(--soft); border-radius: 4px; }
+.directory-coverage > summary { cursor: pointer; color: var(--green); }
+.directory-coverage-table { overflow-x: auto; margin: 12px 0; }
+.directory-coverage-table table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.directory-coverage-table th, .directory-coverage-table td { padding: 8px; text-align: start; vertical-align: top; }
+.directory-coverage-table th { color: var(--green); font-weight: 500; }
+.directory-repair-plan { margin-top: 16px; padding: 12px; background: var(--paper); border-radius: 4px; }
 @media(max-width:680px) { .outline-map-settings { grid-template-columns: minmax(0,1fr); } }

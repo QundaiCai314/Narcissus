@@ -12,10 +12,22 @@
 
 目录导图支持章节总览、分支展开、隐藏节点搜索定位、完整SVG与JSON导出。下载的目录导图JSON也可重新导入编辑并保存为独立成果。原有基于正文的知识导图继续支持讲解和提问。
 
+## 独立基准、覆盖核对与分支恢复
+
+保存目录导图时另存`directory_reference`，与可显示的`items`分开。覆盖检查对照该快照逐项比较存在性、唯一绑定、父子关系、标题和页码，并按章/附录列出保留数、缺失数及差异。337/337只表示目录条目保留；“符合基准”还要求位置和内容一致，不代表正文知识覆盖率。正文知识导图原有的`coverage_review`会明确标注为模型主题规划，不能冒充教材目录验收。
+
+早期没有独立基准的版本会返回`available:false`，不从现有节点猜测完整性。可导入已核对目录，先比较，再明确确认。仅保存基准也会生成新版，保留原有节点。
+
+“预览恢复”只从基准快照恢复所选分支，必要时补齐缺失上级；不会调用模型、读取正文或删除分支外节点。预览显示新增、恢复、必要上级及前后差异。保存时核对原版结果和方案指纹，拒绝陈旧方案，按请求编号幂等创建同一family的新版本，原版不变。分支外节点逐字段和顺序保持一致；若存在无法保持该条件的结构冲突，会阻止发布并提示核对。其他分支仍有缺项时继续显示，不把一次局部恢复当作全图完整。
+
+此功能限目录导图。正文知识分支不能被目录标题替换，也未在本轮调用模型补写正文讲解。
+
 `toc_pdf_page`是该目录行所在的PDF物理页；`printed_page`是目录中印刷的正文页码。没有验证二者的对应关系前，`target_pdf_page`保持空值，不用固定偏移猜测正文位置。
 
 接口：`POST /api/notebooks/{id}/outline-preview`，需当前用户拥有笔记本。上传PDF和可选`pages`表单字段，返回`job_id`。使用`GET /api/notebooks/{id}/outline-preview/{job_id}`读取进度与结果。任务仅保存在API进程内存，限所属用户和笔记本访问，20分钟后过期；服务重启后需要重新识别。接口有文件大小、页数和请求频率限制。
 
 `POST /api/notebooks/{id}/outline-map/preview`预览结构；`POST /api/notebooks/{id}/outline-map`确认保存。保存按请求编号幂等，同编号不同内容返回409，未确认或未核对的标记返回422；都需笔记本所有者权限。
+
+`POST /api/learning/{set_id}/directory-coverage`对照基准；`POST /api/learning/{set_id}/directory-branch/preview`预览分支恢复或仅保存基准；`POST /api/learning/{set_id}/directory-branch`确认保存新版。上述操作均需所属笔记本权限，不发送后台生成任务，不运行数据库迁移。
 
 验证：`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=backend python -m pytest backend/tests/test_pdf_outline.py -q`。

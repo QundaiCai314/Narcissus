@@ -2,11 +2,12 @@ import type {LearningItem} from './learning';
 
 export type Positioned={node:LearningItem;x:number;y:number;height:number};
 export function revealPath(items:LearningItem[],id:string,collapsed:Set<string>) {
-  const next=new Set(collapsed),byId=new Map(items.map(item=>[item.id,item]));let current=byId.get(id);
-  while(current?.parent_id){next.delete(current.parent_id);current=byId.get(current.parent_id);}
+  const next=new Set(collapsed),byId=new Map(items.map(item=>[item.id,item])),seen=new Set<string>();let current=byId.get(id);
+  while(current?.parent_id&&!seen.has(current.id)){seen.add(current.id);next.delete(current.parent_id);current=byId.get(current.parent_id);}
   return next;
 }
 export function layoutMindmap(all:LearningItem[],collapsed=new Set<string>()) {
+  const ids=new Set<string>();all=all.filter(node=>{if(ids.has(node.id))return false;ids.add(node.id);return true;});
   const children=new Map<string,LearningItem[]>();
   all.forEach(node=>{if(node.parent_id)children.set(node.parent_id,[...(children.get(node.parent_id)||[]),node]);});
   const nodes:Positioned[]=[],heights=new Map<string,number>();

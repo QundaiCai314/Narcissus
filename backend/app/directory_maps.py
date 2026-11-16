@@ -86,4 +86,4 @@ def build(data:DirectoryMapInput):
         review_pending=sum(e.needs_review and not e.reviewed for e in data.entries))
     canonical=dict(title=data.title.strip(),source_name=data.source_name,entries=[e.model_dump() for e in data.entries],pages_read=data.pages_read)
     fingerprint=hashlib.sha256(json.dumps(canonical,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
-    return dict(items=items,outline=summary,fingerprint=fingerprint)
+    return dict(items=items,outline=summary,fingerprint=fingerprint,reference=canonical,reference_confirmed=data.confirmed)

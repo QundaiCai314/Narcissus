@@ -8,6 +8,7 @@ import {
 } from "@/lib/learning";
 import { ReferenceList } from "./writing-view";
 import { NodeExplanation } from "./node-explanation";
+import {DirectoryCoveragePanel} from './directory-coverage';
 
 import {layoutMindmap,mindmapSvg,revealPath} from '@/lib/mindmap-layout';
 function overview(items: LearningItem[]) {
@@ -83,8 +84,10 @@ export function MindMap({
   }, []);
   const node = (row.items || []).find((n) => n.id === selected);
   const trail: LearningItem[] = [];
+  const trailIds=new Set<string>();
   let ancestor = node;
-  while (ancestor) {
+  while (ancestor&&!trailIds.has(ancestor.id)) {
+    trailIds.add(ancestor.id);
     trail.unshift(ancestor);
     ancestor = row.items?.find((item) => item.id === ancestor?.parent_id);
   }
@@ -102,8 +105,8 @@ export function MindMap({
   function download(format:'json'|'svg') {
     const styles=getComputedStyle(document.documentElement);
     const colors={paper:styles.getPropertyValue('--paper').trim(),ink:styles.getPropertyValue('--ink').trim(),line:styles.getPropertyValue('--line').trim(),accent:styles.getPropertyValue('--green').trim()};
-    const directoryEntries=directoryOnly?(row.items||[]).filter(item=>item.directory).map(item=>({...item.directory,id:item.id,parent_id:item.parent_id==='__outline_root__'?null:item.parent_id})):undefined;
-    const content=format==='svg'?mindmapSvg(row.items||[],row.title,colors):JSON.stringify({title:row.title,items:row.items,outline:row.outline,entries:directoryEntries,source_name:row.outline?.source_name,pages_read:row.outline?.pages_read,unparsed_lines:[],warnings:[]},null,2);
+    const directoryEntries=directoryOnly?(row.directory_reference?.entries||(row.items||[]).filter(item=>item.directory).map(item=>({...item.directory,id:item.id,parent_id:item.parent_id==='__outline_root__'?null:item.parent_id}))):undefined;
+    const content=format==='svg'?mindmapSvg(row.items||[],row.title,colors):JSON.stringify({title:row.title,items:row.items,outline:row.outline,entries:directoryEntries,directory_reference:row.directory_reference,directory_coverage:row.directory_coverage,source_name:row.outline?.source_name,pages_read:row.outline?.pages_read,unparsed_lines:[],warnings:[]},null,2);
     const url=URL.createObjectURL(new Blob([content],{type:format==='svg'?'image/svg+xml;charset=utf-8':'application/json;charset=utf-8'}));
     const link=document.createElement('a');link.href=url;link.download=`narcissus-mindmap.${format}`;link.click();URL.revokeObjectURL(url);
   }
@@ -123,7 +126,9 @@ export function MindMap({
     focusTarget.current=null;
     if (!collapsed.has(id)) {
       let current = node;
-      while (current?.parent_id) {
+      const seen=new Set<string>();
+      while (current?.parent_id&&!seen.has(current.id)) {
+        seen.add(current.id);
         if (current.parent_id === id) {
           setSelected(id);
           break;
@@ -140,7 +145,9 @@ export function MindMap({
   }
   return (
     <div className="learning-detail">
-      {row.outline&&<p className="muted" role="status">目录覆盖 {row.outline.covered_entries} / {row.outline.entry_count} 项 · {row.outline.chapter_count} 章 · {row.outline.directory_depth} 层目录（含书名导航共 {row.outline.map_depth} 层） · 大模型调用 0 次</p>}
+      {row.outline&&<p className="muted" role="status">{row.directory_coverage?.available?`目录保留 ${row.directory_coverage.present_entries} / ${row.directory_coverage.expected_entries} 项，其中 ${row.directory_coverage.healthy_entries} 项符合基准`:row.id==='directory-preview'?`本次构建保留 ${row.outline.covered_entries} / ${row.outline.entry_count} 项`:`当前 ${row.count} 个节点，尚无独立目录基准`} · {row.outline.chapter_count} 章 · 目录{row.outline.directory_depth}层，含书名导航共{row.outline.map_depth}层 · 大模型调用 0 次</p>}
+      {directoryOnly&&row.id!=='directory-preview'&&<DirectoryCoveragePanel row={row} selectedId={selected} onFocus={focusNode}/>}
+      {!directoryOnly&&row.coverage_review&&<p className="source-warning">当前覆盖检查依据是模型规划的主题，不是已确认的教材目录。{row.coverage_review.missing_sections.length?`仍缺：${row.coverage_review.missing_sections.join('、')}。`:''}主题数量不能证明章节完整。</p>}
       <div className="learning-toolbar">
         <button
           className="button"

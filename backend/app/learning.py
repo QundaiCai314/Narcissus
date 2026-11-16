@@ -16,6 +16,7 @@ from .models import LearningSet, CardProgress, QuizAttempt, Document, Chunk, now
 from .security import current_user, rate_limit
 from .writings import source_state
 from .directory_maps import DirectoryMapInput, build as build_directory_map
+from . import directory_coverage
 
 router = APIRouter(tags=["学习"])
 ACTIVE = ("queued", "running")
@@ -204,7 +205,14 @@ def serialize(db, row, user_id, full=False):
                 card_items(row) if row.kind == "flashcards" else row.result["items"]
             )
             data["citations"] = refs(db, row)
-            if row.params.get('origin')=='outline':data['outline']=row.result.get('outline')
+            if row.kind=='mindmap' and row.params.get('origin')=='outline':
+                data['outline']=row.result.get('outline')
+                data['directory_reference']=row.result.get('directory_reference')
+                data['directory_coverage']=directory_coverage.audit(row.result['items'],directory_coverage.reference_for(row.result))
+                if data['outline'] and data['directory_coverage']['available']:
+                    data['outline']={**data['outline'],'covered_entries':data['directory_coverage']['present_entries'],'node_count':len(row.result['items'])}
+            elif row.kind=='mindmap' and row.result.get('coverage_review'):
+                data['coverage_review']={**row.result['coverage_review'],'basis':'model_planned_topics'}
     return data
 
 
@@ -231,9 +239,60 @@ def save_directory_map(notebook_id:str,data:DirectoryMapInput,user=Depends(curre
     row=LearningSet(id=uid(),notebook_id=notebook_id,family_id=uid(),version=1,request_key=str(data.request_key),
         kind='mindmap',title=(data.title.strip()+' · 目录导图')[:120],
         params=dict(origin='outline',outline_fingerprint=compiled['fingerprint'],topic=data.title.strip(),audience='',difficulty='standard',count=len(compiled['items'])),
-        sources=[],status='complete',phase='complete',result=dict(items=compiled['items'],outline=compiled['outline']),citations=[],
+        sources=[],status='complete',phase='complete',result=dict(items=compiled['items'],outline=compiled['outline'],directory_reference=compiled['reference']),citations=[],
         model=None,attempts=0,completed_at=now(),warning='目录导图仅表示教材结构；尚未导入正文，节点不包含知识点讲解。')
     db.add(row);nb.updated_at=now();db.commit();db.refresh(row)
+    return serialize(db,row,user.id,True)
+
+
+def directory_row(db,user_id,set_id,lock=False):
+    row=owned(db,user_id,set_id,lock)
+    require_complete(row,'mindmap')
+    if row.params.get('origin')!='outline':
+        fail(409,'not_directory','当前是正文知识导图，不能用目录节点替换知识内容')
+    return row
+
+
+@router.post('/learning/{set_id}/directory-coverage')
+def check_directory_coverage(set_id:str,data:directory_coverage.CoverageInput,user=Depends(current_user),db=Depends(db_session)):
+    row=directory_row(db,user.id,set_id)
+    try:return directory_coverage.audit(row.result['items'],directory_coverage.reference_for(row.result,data.reference))
+    except ValueError as exc:fail(422,'invalid_directory_reference',str(exc))
+
+
+@router.post('/learning/{set_id}/directory-branch/preview')
+def preview_directory_branch(set_id:str,data:directory_coverage.BranchInput,user=Depends(current_user),db=Depends(db_session)):
+    row=directory_row(db,user.id,set_id)
+    try:staged=directory_coverage.plan(row.result,data)
+    except ValueError as exc:fail(422,'directory_repair_failed',str(exc))
+    return {key:value for key,value in staged.items() if key not in ('items','reference')}
+
+
+@router.post('/learning/{set_id}/directory-branch',status_code=201)
+def save_directory_branch(set_id:str,data:directory_coverage.BranchInput,user=Depends(current_user),db=Depends(db_session)):
+    old=directory_row(db,user.id,set_id,True)
+    if not data.confirmed:fail(422,'repair_unconfirmed','请先预览并确认本次修改')
+    try:staged=directory_coverage.plan(old.result,data)
+    except ValueError as exc:fail(422,'directory_repair_failed',str(exc))
+    if data.base_fingerprint!=staged['base_fingerprint'] or data.plan_fingerprint!=staged['plan_fingerprint']:
+        fail(409,'directory_changed','目录或修复方案已变化，请重新预览')
+    existing=db.scalar(select(LearningSet).where(LearningSet.notebook_id==old.notebook_id,LearningSet.request_key==str(data.request_key)))
+    if existing:
+        if existing.params.get('outline_repair_fingerprint')!=staged['plan_fingerprint'] or existing.family_id!=old.family_id:
+            fail(409,'key_reused','请求编号已用于其他修改，请重新预览')
+        return serialize(db,existing,user.id,True)
+    if not staged['has_changes']:fail(409,'repair_not_needed','该分支已符合目录基准，无需恢复')
+    rate_limit('directory_repair:'+user.id,30,3600)
+    version=(db.scalar(select(func.max(LearningSet.version)).where(LearningSet.family_id==old.family_id)) or 0)+1
+    summary={key:staged[key] for key in ('branch_id','added','restored','ancestor_count','outside_unchanged')}
+    row=LearningSet(id=uid(),notebook_id=old.notebook_id,family_id=old.family_id,version=version,request_key=str(data.request_key),
+        kind='mindmap',title=old.title,params={**old.params,'outline_fingerprint':staged['reference_fingerprint'],
+            'outline_repair_fingerprint':staged['plan_fingerprint'],'count':len(staged['items'])},
+        sources=[],status='complete',phase='complete',result={**old.result,'items':staged['items'],'outline':staged['outline'],
+            'directory_reference':staged['reference'],'branch_update':dict(summary,source_set_id=old.id)},citations=[],model=None,attempts=0,
+        completed_at=now(),warning='目录导图仅表示教材结构，尚未读取正文。'+('' if staged['after']['complete'] else '仍有目录差异，请继续核对。'))
+    access.notebook(db,user.id,old.notebook_id).updated_at=now()
+    db.add(row);db.commit();db.refresh(row)
     return serialize(db,row,user.id,True)
 
 

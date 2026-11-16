@@ -27,6 +27,7 @@ export type LearningItem = {
   point?: string;
   options?: string[];
   refs: number[];
+  source_entry_id?:string;
   directory?:{number:string|null;title:string;kind:string;printed_page:number|null;toc_pdf_page:number|null;target_pdf_page:number|null};
 };
 export type AttemptBrief = {
@@ -76,6 +77,17 @@ export type LearningSet = {
   mastery?: { mastered: number; review: number; total: number };
   latest_attempt?: AttemptBrief | null;
   outline?:{entry_count:number;covered_entries:number;node_count:number;chapter_count:number;part_count:number;directory_depth:number;map_depth:number;source_name:string;pages_read:number[];model_calls:number;embedding_calls:number;review_pending:number};
+  directory_reference?:DirectoryReference|null;
+  directory_coverage?:DirectoryCoverage;
+  coverage_review?:{basis:'model_planned_topics';expected_sections:string[];missing_sections:string[]};
+};
+export type DirectoryReference={title:string;source_name:string;entries:Record<string,unknown>[];pages_read:number[]};
+export type DirectoryDifference={id:string;number:string|null;title:string};
+export type DirectoryCoverage={available:false;reason:string}|{
+  available:true;basis:string;reference_confirmed:boolean;source_name:string;expected_entries:number;present_entries:number;healthy_entries:number;
+  missing:DirectoryDifference[];misplaced:DirectoryDifference[];changed:DirectoryDifference[];duplicates:DirectoryDifference[];
+  unexpected:{id:string;title:string}[];structural_issues:string[];review_pending:number;reference_fingerprint:string;complete:boolean;
+  chapters:{id:string;number:string|null;title:string;expected:number;present:number;healthy:number;missing:number;misplaced:number;changed:number;duplicates:number}[];
 };
 export type CardProgress = {
   revision: number;
