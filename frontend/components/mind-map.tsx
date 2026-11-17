@@ -12,16 +12,20 @@ import {DirectoryCoveragePanel} from './directory-coverage';
 import {DirectoryPageMapping} from './directory-page-mapping';
 
 import {layoutMindmap,mindmapSvg,revealPath} from '@/lib/mindmap-layout';
+import {fitCamera,graphSignature,progressKey,readPosition,resizeCamera,type ViewportSize,type ReadingPosition} from '@/lib/mindmap-progress';
+import {useMindmapOwner} from '@/hooks/use-mindmap-owner';
 function overview(items: LearningItem[]) {
   const root = items.find((item) => !item.parent_id);
   return new Set(items.filter((item) => item.parent_id && item.directory?.kind!=='part' && (items.length > 24 || item.parent_id !== root?.id)).map((item) => item.id));
 }
 export function MindMap({
   row,
+  notebookId,
   onCitation,
   onAsk,
 }: {
   row: LearningSet;
+  notebookId?:string;
   onCitation: OnCitation;
   onAsk: (context: LearningContext, title: string) => void;
 }) {
@@ -36,6 +40,16 @@ export function MindMap({
   const [query,setQuery]=useState(''),[pendingFocus,setPendingFocus]=useState<string|null>(null);
   const focusTarget=useRef<string|null>(null);
   const layoutRef=useRef(layout);layoutRef.current=layout;
+  const selectedRef=useRef(selected);selectedRef.current=selected;
+  const sizeRef=useRef<ViewportSize>({width:0,height:0});
+  const [size,setSize]=useState<ViewportSize>(sizeRef.current);
+  const persist=!!notebookId&&row.id!=='directory-preview';
+  const owner=useMindmapOwner(persist);
+  const storageKey=progressKey(owner.id||undefined,notebookId,row.id,row.version);
+  const signature=graphSignature(row.items||[]);
+  const [loaded,setLoaded]=useState<string|null>(null),[progress,setProgress]=useState('');
+  const activeIdentity=storageKey?storageKey+signature:null;
+  const hydrated=useRef(false),write=useRef<()=>void>(()=>{});
   const directoryOnly=row.params.origin==='outline';
   const fit = useCallback(() => {
     const w = viewport.current?.clientWidth || 0;
@@ -43,24 +57,56 @@ export function MindMap({
     const current=layoutRef.current;
     const focused=current.nodes.find(item=>item.node.id===focusTarget.current);
     if(focused){setView({z:1,x:w/2-focused.x-110,y:(viewport.current?.clientHeight||430)/2-focused.y-focused.height/2});return;}
-    const z = Math.max(
-      0.12,
-      Math.min(1.2, (w - 24) / current.width, ((viewport.current?.clientHeight || 430) - 30) / current.height),
-    );
-    setView({
-      x: (w - current.width * z) / 2,
-      y: ((viewport.current?.clientHeight || 430) - current.height * z) / 2,
-      z,
-    });
-  }, [layout.width,layout.height]);
+    setView(fitCamera(current.width,current.height,{width:w,height:viewport.current?.clientHeight||430}));
+  }, []);
   useEffect(() => {
     const target = viewport.current;
     if (!target) return;
-    const observer = new ResizeObserver(fit);
+    const resize=()=>{
+      const next={width:target.clientWidth,height:target.clientHeight};
+      if(next.width<1||next.height<1)return;
+      const previous=sizeRef.current;
+      if(next.width===previous.width&&next.height===previous.height)return;
+      sizeRef.current=next;setSize(next);
+      if(hydrated.current)setView(camera=>resizeCamera(camera,previous,next,layoutRef.current.nodes.find(n=>n.node.id===selectedRef.current)));
+      else fit();
+    };
+    const observer = new ResizeObserver(resize);
     observer.observe(target);
-    fit();
+    resize();
     return () => observer.disconnect();
   }, [fit]);
+  const visible=size.width>0&&size.height>0;
+  useEffect(()=>{
+    if(!owner.checked||!visible)return;
+    hydrated.current=false;setLoaded(null);focusTarget.current=null;
+    let saved:ReadingPosition|null=null,blocked=false;
+    if(storageKey){try{saved=readPosition(localStorage.getItem(storageKey),signature,row.items||[]);}catch{blocked=true;}}
+    const nextCollapsed=saved?new Set(saved.collapsed):overview(row.items||[]);
+    const nextSelected=saved?.selected||row.items?.find(item=>!item.parent_id)?.id||'';
+    const nextLayout=layoutMindmap(row.items||[],nextCollapsed),target=nextLayout.nodes.find(n=>n.node.id===nextSelected);
+    setCollapsed(nextCollapsed);setSelected(nextSelected);setPendingFocus(null);
+    setView(saved?resizeCamera(saved.camera,saved.viewport,sizeRef.current,target):fitCamera(nextLayout.width,nextLayout.height,sizeRef.current));
+    setQuery('');hydrated.current=true;
+    setLoaded(blocked?null:activeIdentity);
+    setProgress(!persist?'':blocked?'浏览器存储不可用，本次位置不保存':!storageKey?'未能确认账号，本次位置不保存':saved?'已恢复上次阅读位置 · 仅本机':'阅读位置自动保存 · 仅本机');
+    // Restore only on identity/topology changes, never on ordinary window resizing.
+  },[activeIdentity,owner.checked,visible,signature,persist]);
+  const snapshot:ReadingPosition={schema:1,signature,selected,collapsed:[...collapsed].filter(id=>layout.children.has(id)),camera:view,viewport:size,savedAt:Date.now()};
+  write.current=()=>{
+    if(!storageKey||loaded!==activeIdentity||!visible)return;
+    try{localStorage.setItem(storageKey,JSON.stringify(snapshot));}
+    catch{setLoaded(null);setProgress('浏览器存储不可用，本次位置不保存');}
+  };
+  useEffect(()=>{
+    if(!storageKey||loaded!==activeIdentity||!visible)return;
+    const timer=setTimeout(()=>write.current(),400);return()=>clearTimeout(timer);
+  },[storageKey,activeIdentity,loaded,selected,collapsed,view,size,visible]);
+  useEffect(()=>{
+    const flush=()=>write.current(),hidden=()=>{if(document.visibilityState==='hidden')flush();};
+    window.addEventListener('pagehide',flush);document.addEventListener('visibilitychange',hidden);
+    return()=>{flush();window.removeEventListener('pagehide',flush);document.removeEventListener('visibilitychange',hidden);};
+  },[]);
   useEffect(() => {
     const target = viewport.current;
     if (!target) return;
@@ -143,6 +189,7 @@ export function MindMap({
       else next.add(id);
       return next;
     });
+    setPendingFocus(id);
   }
   return (
     <div className="learning-detail">
@@ -175,10 +222,12 @@ export function MindMap({
         </button>
         <button className="text-button" onClick={() => {
           focusTarget.current=null;
-          setCollapsed(overview(row.items || []));
+          const collapsed=overview(row.items||[]),next=layoutMindmap(row.items||[],collapsed);
+          setCollapsed(collapsed);setPendingFocus(null);setQuery('');
           setSelected(row.items?.find((item) => !item.parent_id)?.id || "");
+          setView(fitCamera(next.width,next.height,sizeRef.current));
         }}>
-          章节总览
+          恢复章节总览
         </button>
         <span className="muted">
           {Math.round(view.z * 100)}% · 拖动画布移动
@@ -186,6 +235,7 @@ export function MindMap({
         <button className="text-button" onClick={()=>download('svg')}>下载完整SVG</button>
         <button className="text-button" onClick={()=>download('json')}>下载导图JSON</button>
       </div>
+      {progress&&<p className="mindmap-reading-status muted" role="status">{progress}</p>}
       <div className="mindmap-search">
         <input aria-label="搜索导图节点" placeholder="搜索章节或知识点…" value={query} onChange={event=>setQuery(event.target.value)}/>
         {query.trim()&&<div aria-label="节点搜索结果">{(row.items||[]).filter(item=>(item.title||'').toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())).slice(0,20).map(item=><button className="text-button" key={item.id} onClick={()=>{focusNode(item.id);setQuery('');}}>{item.title}</button>)}

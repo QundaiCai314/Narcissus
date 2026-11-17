@@ -77,6 +77,7 @@
 .node-evidence-reader .source-snapshot { white-space: pre-wrap; font-size: 14px; line-height: 1.9; }
 .node-evidence-pdf .pdf-canvas-scroll { max-height: 480px; overflow: auto; }
 .node-detail-content { min-width: 0; }
+.mindmap-reading-status { margin: 8px 0; font-size: 12px; }
 .outline-entries { list-style: none; padding: 0; }
 .outline-entries li { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
 .outline-number { font-size: 12px; color: var(--green); }

@@ -905,6 +905,7 @@ export function LearningPanel({
                 <MindMap
                   key={row.id}
                   row={row}
+                  notebookId={notebookId}
                   onCitation={onCitation}
                   onAsk={(context, title) =>
                     onAsk(
