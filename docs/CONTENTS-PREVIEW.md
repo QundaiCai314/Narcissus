@@ -22,6 +22,16 @@
 
 此功能限目录导图。正文知识分支不能被目录标题替换，也未在本轮调用模型补写正文讲解。
 
+## PDF页码校准
+
+书内印刷页码、目录所在PDF页码、正文PDF位置分别记录。读取PDF页数、SHA-256和显式`/PageLabels`元数据不提取页面文字，不调用模型。没有`/PageLabels`时不使用阅读器默认的1至N标签推断书内页码；重复数字标签仅作为多个候选。
+
+在目录节点的“PDF页码定位”里选择本机原PDF，可预览目录页或人工指定的候选PDF页。文件不入库；预览在浏览器中使用本机File对象。绑定后用内容哈希和页数检查是否同一文件，文件重命名不会影响匹配。旧`target_pdf_page`不直接作为已验证正文位置，只可填入待核对候选。PDF预览遇到越界或非整数页码会报错，不再夹到末页并显示错误页号。
+
+校准支持单条位置与多个连续区间。区间必须同时核对印刷起止页、PDF起止页及中间连续性；两端页差不一致、重叠或越界会拒绝。单条定位优先，未确认的单条位置不回退到区间推算。未覆盖区间的条目保留未定位状态，不能根据一个起点外推全书。确认绑定文件、核对所有定位后，先预览再按方案指纹保存为新版，旧版本与节点内容/层级不变。目录基准或文件变化后旧映射失效，浏览器需重新确认，不静默复用。
+
+JSON导出保留文件身份和校准快照，目录快照只代表目录事实；重新建立独立导图时不会把未经当前版本确认的旧位置自动当作可靠跳转。
+
 `toc_pdf_page`是该目录行所在的PDF物理页；`printed_page`是目录中印刷的正文页码。没有验证二者的对应关系前，`target_pdf_page`保持空值，不用固定偏移猜测正文位置。
 
 接口：`POST /api/notebooks/{id}/outline-preview`，需当前用户拥有笔记本。上传PDF和可选`pages`表单字段，返回`job_id`。使用`GET /api/notebooks/{id}/outline-preview/{job_id}`读取进度与结果。任务仅保存在API进程内存，限所属用户和笔记本访问，20分钟后过期；服务重启后需要重新识别。接口有文件大小、页数和请求频率限制。
@@ -29,5 +39,7 @@
 `POST /api/notebooks/{id}/outline-map/preview`预览结构；`POST /api/notebooks/{id}/outline-map`确认保存。保存按请求编号幂等，同编号不同内容返回409，未确认或未核对的标记返回422；都需笔记本所有者权限。
 
 `POST /api/learning/{set_id}/directory-coverage`对照基准；`POST /api/learning/{set_id}/directory-branch/preview`预览分支恢复或仅保存基准；`POST /api/learning/{set_id}/directory-branch`确认保存新版。上述操作均需所属笔记本权限，不发送后台生成任务，不运行数据库迁移。
+
+`POST /api/learning/{set_id}/pdf-page-metadata`核对原文件元数据；`POST /api/learning/{set_id}/page-mapping/preview`预览校准；`POST /api/learning/{set_id}/page-mapping`确认保存。仅目录导图所有者可用，不创建Document、不写对象存储或向量库。
 
 验证：`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=backend python -m pytest backend/tests/test_pdf_outline.py -q`。

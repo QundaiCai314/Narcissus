@@ -5,6 +5,7 @@ import re
 from typing import Literal
 from uuid import UUID
 from pydantic import BaseModel, Field, StrictInt
+from .page_mapping import SourcePDF
 
 
 class DirectoryEntry(BaseModel):
@@ -25,6 +26,7 @@ class DirectoryMapInput(BaseModel):
     source_name:str=Field(default='',max_length=240)
     entries:list[DirectoryEntry]=Field(min_length=1,max_length=2000)
     pages_read:list[StrictInt]=Field(default_factory=list,max_length=12)
+    source_pdf:SourcePDF|None=None
     unresolved_lines:StrictInt=Field(default=0,ge=0)
     failed_pages:list[StrictInt]=Field(default_factory=list,max_length=12)
     confirmed:bool=False
@@ -85,5 +87,6 @@ def build(data:DirectoryMapInput):
         pages_read=data.pages_read,model_calls=0,embedding_calls=0,
         review_pending=sum(e.needs_review and not e.reviewed for e in data.entries))
     canonical=dict(title=data.title.strip(),source_name=data.source_name,entries=[e.model_dump() for e in data.entries],pages_read=data.pages_read)
+    if data.source_pdf is not None:canonical['source_pdf']=data.source_pdf.model_dump()
     fingerprint=hashlib.sha256(json.dumps(canonical,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
     return dict(items=items,outline=summary,fingerprint=fingerprint,reference=canonical,reference_confirmed=data.confirmed)

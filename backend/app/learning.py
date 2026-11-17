@@ -17,6 +17,7 @@ from .security import current_user, rate_limit
 from .writings import source_state
 from .directory_maps import DirectoryMapInput, build as build_directory_map
 from . import directory_coverage
+from . import page_mapping
 
 router = APIRouter(tags=["学习"])
 ACTIVE = ("queued", "running")
@@ -208,6 +209,8 @@ def serialize(db, row, user_id, full=False):
             if row.kind=='mindmap' and row.params.get('origin')=='outline':
                 data['outline']=row.result.get('outline')
                 data['directory_reference']=row.result.get('directory_reference')
+                data['page_mapping']=row.result.get('page_mapping')
+                data['page_locations']=page_mapping.current(row.result)
                 data['directory_coverage']=directory_coverage.audit(row.result['items'],directory_coverage.reference_for(row.result))
                 if data['outline'] and data['directory_coverage']['available']:
                     data['outline']={**data['outline'],'covered_entries':data['directory_coverage']['present_entries'],'node_count':len(row.result['items'])}
@@ -251,6 +254,54 @@ def directory_row(db,user_id,set_id,lock=False):
     if row.params.get('origin')!='outline':
         fail(409,'not_directory','当前是正文知识导图，不能用目录节点替换知识内容')
     return row
+
+
+@router.post('/learning/{set_id}/pdf-page-metadata')
+def pdf_page_metadata(set_id:str,file:UploadFile=File(...),user=Depends(current_user),db=Depends(db_session)):
+    from .config import settings
+    directory_row(db,user.id,set_id)
+    rate_limit('pdf_page_metadata:'+user.id,20,3600)
+    if not (file.filename or '').lower().endswith('.pdf'):fail(422,'pdf_required','请选择原PDF文件')
+    raw=file.file.read(settings().max_upload_mb*1024*1024+1)
+    if len(raw)>settings().max_upload_mb*1024*1024:fail(413,'too_large','PDF文件超过大小限制')
+    if not raw.startswith(b'%PDF-'):fail(422,'invalid_pdf','文件不是有效PDF')
+    try:return page_mapping.metadata(raw)
+    except ValueError as exc:fail(422,'pdf_metadata_failed',str(exc))
+    except Exception:fail(422,'pdf_metadata_failed','PDF页码元数据无法读取，请核对文件')
+
+
+@router.post('/learning/{set_id}/page-mapping/preview')
+def preview_page_mapping(set_id:str,data:page_mapping.MappingInput,user=Depends(current_user),db=Depends(db_session)):
+    row=directory_row(db,user.id,set_id)
+    try:staged=page_mapping.plan(row.result,data)
+    except ValueError as exc:fail(422,'invalid_page_mapping',str(exc))
+    return {key:value for key,value in staged.items() if key not in ('settings','reference')}
+
+
+@router.post('/learning/{set_id}/page-mapping',status_code=201)
+def save_page_mapping(set_id:str,data:page_mapping.MappingInput,user=Depends(current_user),db=Depends(db_session)):
+    old=directory_row(db,user.id,set_id,True)
+    if not data.confirmed:fail(422,'mapping_unconfirmed','请核对PDF文件和本次映射后再保存')
+    try:staged=page_mapping.plan(old.result,data)
+    except ValueError as exc:fail(422,'invalid_page_mapping',str(exc))
+    if staged['pending']:fail(422,'mapping_pending','还有未核对的定位条目或区间')
+    if data.base_fingerprint!=staged['base_fingerprint'] or data.plan_fingerprint!=staged['plan_fingerprint']:
+        fail(409,'mapping_changed','目录或页码方案已变化，请重新预览')
+    existing=db.scalar(select(LearningSet).where(LearningSet.notebook_id==old.notebook_id,LearningSet.request_key==str(data.request_key)))
+    if existing:
+        if existing.family_id!=old.family_id or existing.params.get('page_mapping_fingerprint')!=staged['plan_fingerprint']:
+            fail(409,'key_reused','请求编号已用于其他映射，请重新预览')
+        return serialize(db,existing,user.id,True)
+    if not staged['has_changes']:fail(409,'mapping_unchanged','页码设置没有变化')
+    rate_limit('page_mapping_save:'+user.id,30,3600)
+    version=(db.scalar(select(func.max(LearningSet.version)).where(LearningSet.family_id==old.family_id)) or 0)+1
+    row=LearningSet(id=uid(),notebook_id=old.notebook_id,family_id=old.family_id,version=version,request_key=str(data.request_key),
+        kind='mindmap',title=old.title,params={**old.params,'outline_fingerprint':staged['reference_fingerprint'],'page_mapping_fingerprint':staged['plan_fingerprint']},
+        sources=[],status='complete',phase='complete',result={**old.result,'directory_reference':staged['reference'],'page_mapping':staged['settings']},
+        citations=[],model=None,attempts=0,completed_at=now(),warning='目录导图仅表示教材结构。PDF定位来自人工核对；未校准的条目不会推算正文页。')
+    access.notebook(db,user.id,old.notebook_id).updated_at=now()
+    db.add(row);db.commit();db.refresh(row)
+    return serialize(db,row,user.id,True)
 
 
 @router.post('/learning/{set_id}/directory-coverage')

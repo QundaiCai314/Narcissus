@@ -2,14 +2,17 @@
 import { useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { request, errorText } from "@/lib/api";
+import {requirePdfPage} from '@/lib/pdf-pages';
 
 export function PdfPreview({
   documentId,
   page,
   filename,
   version,
+  file,
 }: {
-  documentId: string;
+  documentId?: string;
+  file?:File;
   page: number;
   filename: string;
   version?: number;
@@ -42,10 +45,9 @@ export function PdfPreview({
     (async () => {
       const lib = await import("pdfjs-dist");
       lib.GlobalWorkerOptions.workerSrc = "/pdfjs/pdf.worker.min.mjs";
-      const response = await request(`/documents/${documentId}/file${version ? `?version=${version}` : ""}`, {
-        signal: abort.signal,
-      });
-      const data = new Uint8Array(await response.arrayBuffer());
+      if(Boolean(file)===Boolean(documentId))throw new Error('请指定唯一的PDF来源');
+      const bytes=file?await file.arrayBuffer():await (await request(`/documents/${documentId}/file${version ? `?version=${version}` : ""}`, {signal:abort.signal})).arrayBuffer();
+      const data = new Uint8Array(bytes);
       if (abort.signal.aborted) return;
       loadingTask = lib.getDocument({
         data,
@@ -64,7 +66,7 @@ export function PdfPreview({
       abort.abort();
       void loadingTask?.destroy();
     };
-  }, [documentId, version, attempt]);
+  }, [documentId, version, file, attempt]);
 
   useEffect(() => {
     if (!pdf || !canvas.current) return;
@@ -75,9 +77,7 @@ export function PdfPreview({
     setRendered(0);
     setError("");
     (async () => {
-      const current = await pdf.getPage(
-        Math.max(1, Math.min(pdf.numPages, page)),
-      );
+      const current = await pdf.getPage(requirePdfPage(page,pdf.numPages));
       if (disposed || !canvas.current) return;
       const viewport = current.getViewport({
         scale: width / current.getViewport({ scale: 1 }).width,

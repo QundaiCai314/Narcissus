@@ -80,8 +80,15 @@ export type LearningSet = {
   directory_reference?:DirectoryReference|null;
   directory_coverage?:DirectoryCoverage;
   coverage_review?:{basis:'model_planned_topics';expected_sections:string[];missing_sections:string[]};
+  page_mapping?:{source_pdf:SourcePDF;ranges:PageRange[];entry_targets:PageTarget[];reference_fingerprint:string}|null;
+  page_locations?:PageLocations;
 };
-export type DirectoryReference={title:string;source_name:string;entries:Record<string,unknown>[];pages_read:number[]};
+export type SourcePDF={sha256:string;total_pages:number};
+export type PageRange={printed_start:number;printed_end:number;pdf_start:number;pdf_end:number;verified:boolean};
+export type PageTarget={entry_id:string;pdf_page:number;verified:boolean};
+export type PageLocation={entry_id:string;number:string|null;title:string;printed_page:number|null;toc_pdf_page:number|null;body_pdf_page:number|null;method:string;verified:boolean;legacy_target_ignored:boolean};
+export type PageLocations={available:false;reason:string}|{available:true;source_bound:boolean;stale:boolean;source_pdf:SourcePDF|null;entries:number;mapped:number;unmapped:number;locations:PageLocation[];reason:string};
+export type DirectoryReference={title:string;source_name:string;entries:Record<string,unknown>[];pages_read:number[];source_pdf?:SourcePDF};
 export type DirectoryDifference={id:string;number:string|null;title:string};
 export type DirectoryCoverage={available:false;reason:string}|{
   available:true;basis:string;reference_confirmed:boolean;source_name:string;expected_entries:number;present_entries:number;healthy_entries:number;

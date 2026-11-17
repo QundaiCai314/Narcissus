@@ -85,4 +85,12 @@
 .directory-coverage-table th, .directory-coverage-table td { padding: 8px; text-align: start; vertical-align: top; }
 .directory-coverage-table th { color: var(--green); font-weight: 500; }
 .directory-repair-plan { margin-top: 16px; padding: 12px; background: var(--paper); border-radius: 4px; }
+.directory-page-mapping { margin: 12px 0; padding: 12px; background: var(--soft); border-radius: 4px; }
+.directory-page-mapping > summary { cursor: pointer; color: var(--green); }
+.page-target-editor { margin: 16px 0; padding: 12px; background: var(--paper); border-radius: 4px; }
+.page-range-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 12px 0; }
+.page-range-inputs { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; }
+.directory-local-pdf { margin-top: 16px; padding: 8px; background: var(--paper); border-radius: 4px; }
+.directory-local-pdf .pdf-canvas-scroll { max-height: 640px; overflow: auto; }
+@media(max-width:680px) { .page-range-inputs { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media(max-width:680px) { .outline-map-settings { grid-template-columns: minmax(0,1fr); } }

@@ -1,7 +1,7 @@
 "use client";
 import { useRef,useState } from "react";
 import { api, errorText } from "@/lib/api";
-import type {LearningSet} from '@/lib/learning';
+import type {LearningSet,SourcePDF} from '@/lib/learning';
 import {MindMap} from './mind-map';
 
 type Entry = {id:string;parent_id:string|null;level:number;kind:string;number?:string|null;title:string;
@@ -9,7 +9,7 @@ type Entry = {id:string;parent_id:string|null;level:number;kind:string;number?:s
 type Result = {status:string;method:string;total_pdf_pages:number;pages_read:number[];ocr_pages:number[];
   model_calls:number;embedding_calls:number;entries:Entry[];warnings:string[];
   unparsed_lines:{text:string;toc_pdf_page:number;reason:string}[];
-  ignored_headers?:{text:string;toc_pdf_page:number}[];source_name?:string;title?:string;failed_pages?:{pdf_page:number}[]};
+  ignored_headers?:{text:string;toc_pdf_page:number}[];source_name?:string;title?:string;failed_pages?:{pdf_page:number}[];source_pdf?:SourcePDF};
 
 export function OutlinePreview({notebookId,onBusy}:{notebookId:string;onBusy:(value:boolean)=>void}) {
   const [file,setFile]=useState<File|null>(null),[pages,setPages]=useState("");
@@ -43,7 +43,7 @@ export function OutlinePreview({notebookId,onBusy}:{notebookId:string;onBusy:(va
   function payload(){
     if(!result)throw new Error('请先识别或导入目录');
     if(!saveKey.current)saveKey.current=crypto.randomUUID();
-    return {title:mapTitle,source_name:sourceName,entries:result.entries,pages_read:result.pages_read,unresolved_lines:result.unparsed_lines.length,failed_pages:(result.failed_pages||[]).map(page=>page.pdf_page),confirmed,request_key:saveKey.current};
+    return {title:mapTitle,source_name:sourceName,entries:result.entries,pages_read:result.pages_read,source_pdf:result.source_pdf,unresolved_lines:result.unparsed_lines.length,failed_pages:(result.failed_pages||[]).map(page=>page.pdf_page),confirmed,request_key:saveKey.current};
   }
   async function buildMap(save=false){
     setBusy(true);onBusy(true);setError('');setProgress('');

@@ -27,7 +27,7 @@ export function DirectoryCoveragePanel({row,onFocus,selectedId}:{row:LearningSet
       if(value.unparsed_lines!==undefined&&!Array.isArray(value.unparsed_lines))throw new Error('目录核对记录格式错误');
       const next:ReferenceInput={title:typeof value.title==='string'?value.title:(row.params.topic||row.title).slice(0,100),
         source_name:typeof value.source_name==='string'?value.source_name:file.name,entries:value.entries,
-        pages_read:value.pages_read||[],unresolved_lines:value.unparsed_lines?.length||0,
+        pages_read:value.pages_read||[],source_pdf:value.source_pdf,unresolved_lines:value.unparsed_lines?.length||0,
         failed_pages:(value.failed_pages||[]).map((page:number|{pdf_page:number})=>typeof page==='number'?page:page.pdf_page),
         request_key:crypto.randomUUID(),confirmed:false};
       setReference(next);setReferenceConfirmed(false);await check(next);

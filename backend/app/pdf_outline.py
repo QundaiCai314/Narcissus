@@ -134,6 +134,8 @@ def preview(data, requested_pages='', progress=None):
     total=len(reader.pages)
     selected=page_range(requested_pages,total)
     base=dict(total_pdf_pages=total,model_calls=0,embedding_calls=0,pages_read=[],ocr_pages=[],warnings=[])
+    from .page_mapping import identity
+    base['source_pdf']=identity(data,reader)
     if progress:progress(0,len(selected))
     if not selected:
         bookmarks=[]

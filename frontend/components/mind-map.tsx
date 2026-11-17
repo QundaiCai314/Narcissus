@@ -9,6 +9,7 @@ import {
 import { ReferenceList } from "./writing-view";
 import { NodeExplanation } from "./node-explanation";
 import {DirectoryCoveragePanel} from './directory-coverage';
+import {DirectoryPageMapping} from './directory-page-mapping';
 
 import {layoutMindmap,mindmapSvg,revealPath} from '@/lib/mindmap-layout';
 function overview(items: LearningItem[]) {
@@ -106,7 +107,7 @@ export function MindMap({
     const styles=getComputedStyle(document.documentElement);
     const colors={paper:styles.getPropertyValue('--paper').trim(),ink:styles.getPropertyValue('--ink').trim(),line:styles.getPropertyValue('--line').trim(),accent:styles.getPropertyValue('--green').trim()};
     const directoryEntries=directoryOnly?(row.directory_reference?.entries||(row.items||[]).filter(item=>item.directory).map(item=>({...item.directory,id:item.id,parent_id:item.parent_id==='__outline_root__'?null:item.parent_id}))):undefined;
-    const content=format==='svg'?mindmapSvg(row.items||[],row.title,colors):JSON.stringify({title:row.title,items:row.items,outline:row.outline,entries:directoryEntries,directory_reference:row.directory_reference,directory_coverage:row.directory_coverage,source_name:row.outline?.source_name,pages_read:row.outline?.pages_read,unparsed_lines:[],warnings:[]},null,2);
+    const content=format==='svg'?mindmapSvg(row.items||[],row.title,colors):JSON.stringify({title:row.title,items:row.items,outline:row.outline,entries:directoryEntries,directory_reference:row.directory_reference,directory_coverage:row.directory_coverage,source_pdf:row.directory_reference?.source_pdf,page_mapping:row.page_mapping,page_locations:row.page_locations,source_name:row.outline?.source_name,pages_read:row.outline?.pages_read,unparsed_lines:[],warnings:[]},null,2);
     const url=URL.createObjectURL(new Blob([content],{type:format==='svg'?'image/svg+xml;charset=utf-8':'application/json;charset=utf-8'}));
     const link=document.createElement('a');link.href=url;link.download=`narcissus-mindmap.${format}`;link.click();URL.revokeObjectURL(url);
   }
@@ -308,8 +309,9 @@ export function MindMap({
           <span className="eyebrow">{directoryOnly?'目录位置':node.parent_id ? "知识点详解" : "知识导航"}</span>
           <h3>{node.title}</h3>
           {directoryOnly?<>
-            <p className="muted">{row.outline?.source_name}{node.directory?.toc_pdf_page?` · 目录位于PDF第${node.directory.toc_pdf_page}页`:''}{node.directory?.printed_page?` · 书内第${node.directory.printed_page}页`:''}{node.directory?.target_pdf_page?` · PDF正文第${node.directory.target_pdf_page}页`:''}</p>
+            <p className="muted">{row.outline?.source_name}{node.directory?.toc_pdf_page?` · 目录位于PDF第${node.directory.toc_pdf_page}页`:''}{node.directory?.printed_page?` · 书内第${node.directory.printed_page}页`:''}</p>
             <p className="muted">当前仅有目录结构，尚未读取正文。书内印刷页码不直接作为PDF跳转位置。</p>
+            {row.id!=='directory-preview'&&<DirectoryPageMapping row={row} node={node}/>}
           </>:node.parent_id ? <NodeExplanation row={row} node={node} valid={valid} onCitation={onCitation}/> :
             <p className="muted">选择导图中的具体知识点，在这里查看详细讲解与原文依据。</p>}
           {!directoryOnly&&<button
