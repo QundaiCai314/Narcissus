@@ -36,6 +36,19 @@ def wait_for(check, timeout=90):
 
 
 def call(client, method, path, status=200, **kw):
+    if path == '/auth/register' and status == 201 and 'challenge_id' not in kw.get('json', {}):
+        # Legacy full-stack fixtures seed only the isolated test Redis. No production bypass.
+        if os.environ.get('TEST_VERIFICATION_FIXTURE') != '1' or os.environ.get('TEST_MODEL_URL') != 'http://model-fixture:8090':
+            raise RuntimeError('Verified registration fixtures require the isolated test project')
+        from app import registration_email
+        body = dict(kw['json'])
+        email = body['email'].lower()
+        challenge_id = uuid.uuid4().hex
+        code = '123456'
+        key, _ = registration_email.keys(email)
+        registration_email.redis.hset(key, mapping={'id':challenge_id,'digest':registration_email.code_digest(email,challenge_id,code),'state':'active','attempts':0})
+        registration_email.redis.expire(key,60)
+        kw['json'] = {**body,'confirm_password':body['password'],'challenge_id':challenge_id,'verification_code':code}
     r = client.request(method, "/api" + path, **kw)
     assert r.status_code == status, (path, r.status_code, r.text[:1000])
     return r.json() if r.content else None

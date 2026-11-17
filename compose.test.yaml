@@ -4,6 +4,11 @@ services:
   api:
     environment: &test-model-env
       ENVIRONMENT: development
+      APP_SECRET: isolated-test-fixture-secret-at-least-32
+      SMTP_HOST: ''
+      SMTP_USERNAME: ''
+      SMTP_PASSWORD: ''
+      SMTP_FROM: ''
       PUBLIC_ORIGIN: http://localhost:3100
       CHAT_API_KEY: test-fixture-not-a-real-key
       CHAT_BASE_URL: http://model-fixture:8090/v1
@@ -31,6 +36,9 @@ services:
     build: ./backend
     profiles: [test]
     environment:
+      APP_SECRET: isolated-test-fixture-secret-at-least-32
+      TEST_VERIFICATION_FIXTURE: '1'
+      AUTH_TEST_REDIS_URL: redis://:${REDIS_PASSWORD:-narcissus_dev_redis}@redis:6379/0
       TTS_API_KEY: test-fixture-not-a-real-key
       TTS_BASE_URL: http://model-fixture:8090/v1
       TTS_TIMEOUT_SECONDS: 3
@@ -44,4 +52,4 @@ services:
       EMBEDDING_BASE_URL: http://model-fixture:8090/v1
       EMBEDDING_MODEL: protocol-fixture
       EMBEDDING_DIMENSIONS: 8
-    command: pytest -q -p no:cacheprovider tests/test_unit.py tests/test_integration.py tests/test_boundaries.py tests/test_v2.py tests/test_v3.py tests/test_v4.py tests/test_document_repair.py tests/test_v5.py tests/test_v6.py tests/test_v7.py
+    command: pytest -q -p no:cacheprovider tests/test_unit.py tests/test_registration.py tests/test_integration.py tests/test_boundaries.py tests/test_v2.py tests/test_v3.py tests/test_v4.py tests/test_document_repair.py tests/test_v5.py tests/test_v6.py tests/test_v7.py

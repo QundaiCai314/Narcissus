@@ -91,6 +91,13 @@ class Settings(BaseSettings):
     visual_render_timeout: int = 90
     visual_font_path: str = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"
     session_days: int = 7
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_security: Literal["starttls", "ssl"] = "starttls"
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_timeout_seconds: int = 10
     minio_root_password: str = ""
 
     @model_validator(mode="after")
