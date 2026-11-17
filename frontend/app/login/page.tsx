@@ -5,6 +5,7 @@ import { ArrowRight, Eye, EyeOff, BookOpen, MousePointer2 } from "lucide-react";
 import { api, post, errorText } from "@/lib/api";
 import { Brand } from "@/components/shared";
 import { passwordStrength } from "@/lib/password-strength";
+import { READING_QUOTES } from "@/lib/reading-quotes";
 import "./auth.css";
 
 type Options = { email_delivery_available: boolean };
@@ -16,6 +17,7 @@ export default function Login() {
   const [busy, setBusy] = useState(false), [sending, setSending] = useState(false);
   const [options, setOptions] = useState<Options | null>(null), [optionsFailed, setOptionsFailed] = useState(false);
   const [error, setError] = useState(""), [notice, setNotice] = useState("");
+  const [quoteIndex, setQuoteIndex] = useState(0);
   const [challenge, setChallenge] = useState(""), [expires, setExpires] = useState(0), [retry, setRetry] = useState(0), [now, setNow] = useState(0);
   const generation = useRef(0), emailInput = useRef<HTMLInputElement>(null), sendingController = useRef<AbortController | null>(null);
   const strength = passwordStrength(password), seconds = Math.max(0, Math.ceil((retry - now) / 1000)), expired = !!expires && now >= expires;
@@ -24,6 +26,13 @@ export default function Login() {
     try { setOptions(await api<Options>("/auth/registration-options")); } catch { setOptionsFailed(true); }
   }
   useEffect(() => {
+    let next = Math.floor(Math.random() * READING_QUOTES.length);
+    try {
+      const last = Number(sessionStorage.getItem("narcissus:reading-quote") ?? -1);
+      if (next === last) next = (next + 1 + Math.floor(Math.random() * (READING_QUOTES.length - 1))) % READING_QUOTES.length;
+      sessionStorage.setItem("narcissus:reading-quote", String(next));
+    } catch { /* The quote also works when browser storage is unavailable. */ }
+    setQuoteIndex(next);
     api("/auth/me").then(() => router.replace("/")).catch(() => {
       if (new URLSearchParams(window.location.search).has("expired")) setError("登录已过期，请重新登录");
     });
@@ -80,11 +89,24 @@ export default function Login() {
           <MousePointer2 className="vacation-cursor" size={42} aria-hidden="true" />
         </section>
         <section className="account-window" aria-labelledby="account-title">
-          <div className="account-window-bar"><span className="window-pixels" aria-hidden="true"><i /><i /><i /></span><span>你的书房</span><span className="window-square" aria-hidden="true" /></div>
+          <div className="account-window-bar">
+            <span className="window-pixels" aria-hidden="true"><i /><i /><i /></span>
+            <span className="account-window-quote" title={READING_QUOTES[quoteIndex].source}>
+              <q cite={READING_QUOTES[quoteIndex].url}>{READING_QUOTES[quoteIndex].text}</q>
+              <span className="quote-source">出自{READING_QUOTES[quoteIndex].source}</span>
+            </span>
+            <span className="window-square" aria-hidden="true" />
+          </div>
           <div className="account-window-body">
-            <div className="account-modes" aria-label="账号操作"><button type="button" aria-pressed={!register} disabled={busy || sending} onClick={() => changeMode(false)}>登录</button><button type="button" aria-pressed={register} disabled={busy || sending} onClick={() => changeMode(true)}>注册</button></div>
-            <h2 id="account-title">{register ? "留一页，给新发现" : "回到你的书房"}</h2>
-            <p className="account-welcome">{register ? "从一个账号，开始你的阅读收藏。" : "接着上次的好奇，继续读下去。"}</p>
+            <div className="account-entry-heading">
+              <div>
+                <h2 id="account-title">{register ? <>留一页，<br />给新发现。</> : <>回到你的<br />书房。</>}</h2>
+                <p className="account-welcome">{register ? "从一个账号，开始你的阅读收藏。" : "接着上次的好奇，继续读下去。"}</p>
+              </div>
+              <span className="account-bookmark" aria-hidden="true">
+                <svg viewBox="0 0 32 32" fill="none" shapeRendering="crispEdges"><path d="M5 6h9v2h4V6h9v19H18v2h-4v-2H5V6Z" stroke="currentColor" strokeWidth="2" /><path d="M16 8v17M8 11h4M8 15h4M20 11h4M20 15h4" stroke="currentColor" strokeWidth="2" /></svg>
+              </span>
+            </div>
             <form id="account-form" onSubmit={submit} aria-label={register ? "注册账号" : "登录账号"}>
               <fieldset disabled={busy}>
                 <label className="account-field" htmlFor="account-email">邮箱地址</label>
