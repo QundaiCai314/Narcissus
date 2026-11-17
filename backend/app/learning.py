@@ -997,33 +997,56 @@ def resolve_node(db, user_id, notebook_id, context):
     return node, sources, [s["id"] for s in row.sources]
 
 
+def prepare_node_explanation(db,user_id,set_id,node_id):
+    from .node_explanations import scope
+    row=owned(db,user_id,set_id)
+    node,_,_=resolve_node(db,user_id,row.notebook_id,{'set_id':set_id,'node_id':node_id})
+    if node.get('parent_id') is None:
+        fail(422,'choose_knowledge_node','请选择一个具体知识点查看详解')
+    nodes,sources=scope(row.result['items'],node_id,refs(db,row))
+    for source in sources:
+        chunk=db.get(Chunk,source['chunk_id'])
+        if source['state']!='active' or not chunk or chunk.document_id!=source['document_id']:
+            fail(409,'source_changed','知识点原始依据已失效，请生成新版导图')
+    if not sources:fail(409,'no_evidence','当前知识点没有可核验的原文')
+    return nodes,sources
+
+
+def node_explanation_key(user_id,set_id,node_id):
+    import hashlib
+    return 'node-detail:v1:'+hashlib.sha256(f'{user_id}:{set_id}:{node_id}'.encode()).hexdigest()
+
+
+@router.get("/learning/{set_id}/nodes/{node_id}/explanation")
+def read_node_explanation(set_id:str,node_id:str,user=Depends(current_user),db=Depends(db_session)):
+    import json
+    from .security import redis
+    from redis.exceptions import RedisError
+    # Reads never generate and recheck ownership and source versions on each visit.
+    prepare_node_explanation(db,user.id,set_id,node_id)
+    key=node_explanation_key(user.id,set_id,node_id)
+    try:
+        cached=redis.get(key)
+        if cached:return dict(status='ready',detail=json.loads(cached))
+        return dict(status='pending' if redis.get(key+':lock') else 'missing',detail=None)
+    except RedisError:fail(503,'detail_unavailable','讲解服务暂时不可用，请稍后重试')
+
+
 @router.post("/learning/{set_id}/nodes/{node_id}/explanation")
 async def node_explanation(set_id: str, node_id: str, user=Depends(current_user), db=Depends(db_session)):
-    import hashlib
     import json
     import secrets
     from .security import redis
     from redis.exceptions import RedisError
     from .model_service import ModelError
-    from .node_explanations import scope, explain
+    from .node_explanations import explain
     user_id = user.id
 
     def prepare():
-        row = owned(db,user_id,set_id)
-        node, _, _ = resolve_node(db,user_id,row.notebook_id,{'set_id':set_id,'node_id':node_id})
-        if node.get('parent_id') is None:
-            fail(422,'choose_knowledge_node','请选择一个具体知识点查看详解')
-        nodes,sources = scope(row.result['items'],node_id,refs(db,row))
-        for source in sources:
-            chunk = db.get(Chunk,source['chunk_id'])
-            if source['state'] != 'active' or not chunk or chunk.document_id != source['document_id']:
-                fail(409,'source_changed','知识点原始依据已失效，请生成新版导图')
-        if not sources:
-            fail(409,'no_evidence','当前知识点没有可核验的原文')
-        return nodes,sources
+        return prepare_node_explanation(db,user_id,set_id,node_id)
 
     nodes,sources = prepare()
-    key = 'node-detail:v1:' + hashlib.sha256(f'{user_id}:{set_id}:{node_id}'.encode()).hexdigest()
+    key = node_explanation_key(user_id,set_id,node_id)
     try:
         cached = redis.get(key)
         if cached:

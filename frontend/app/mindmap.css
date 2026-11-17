@@ -64,6 +64,19 @@
 .node-detail-loading > div { height: 12px; margin-top: 12px; border-radius: 4px; background: var(--soft); }
 .node-detail-loading > div:last-child { width: 65%; }
 .node-detail-error { padding: 12px 0; color: var(--red); }
+.node-detail-meta, .node-evidence-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 12px; }
+.node-detail-empty { margin: 16px 0; padding: 16px; background: var(--soft); border-radius: 4px; }
+.node-detail-empty h4, .node-evidence h4 { margin: 0; color: var(--green); font-size: 14px; font-weight: 500; }
+.node-detail-empty p { font-size: 14px; line-height: 1.8; }
+.node-detail-empty small { display: block; margin-top: 12px; color: var(--muted); }
+.node-evidence { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--line); }
+.node-evidence-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.node-evidence-tabs button { padding: 4px 8px; border: 1px solid var(--line); border-radius: 4px; }
+.node-evidence-tabs button[aria-pressed="true"] { background: var(--soft); color: var(--green); border-color: var(--green); }
+.node-evidence-reader { padding: 12px; background: var(--soft); border-radius: 4px; overflow-wrap: anywhere; }
+.node-evidence-reader .source-snapshot { white-space: pre-wrap; font-size: 14px; line-height: 1.9; }
+.node-evidence-pdf .pdf-canvas-scroll { max-height: 480px; overflow: auto; }
+.node-detail-content { min-width: 0; }
 .outline-entries { list-style: none; padding: 0; }
 .outline-entries li { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
 .outline-number { font-size: 12px; color: var(--green); }

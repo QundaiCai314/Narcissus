@@ -79,6 +79,7 @@ def endpoint(monkeypatch):
         return dict(title='货币供给',sections=[],citations=[SOURCE],warning=None)
     monkeypatch.setattr(detail,'explain',explain)
     def run(owner='owner'):return asyncio.run(learning.node_explanation('set','n',SimpleNamespace(id=owner),db))
+    state['read']=lambda owner='owner':learning.read_node_explanation('set','n',SimpleNamespace(id=owner),db)
     return run,state,store
 
 
@@ -100,3 +101,34 @@ def test_source_change_during_generation_is_not_cached(endpoint,monkeypatch):
     monkeypatch.setattr(detail,'explain',explain)
     with pytest.raises(HTTPException) as changed:run()
     assert changed.value.status_code==409 and not store
+
+
+def test_read_missing_and_pending_never_generates_or_writes_cache(endpoint):
+    _,state,store=endpoint
+    assert state['read']()=={'status':'missing','detail':None}
+    assert state['calls']==0 and not store
+    store[learning.node_explanation_key('owner','set','n')+':lock']='other-request'
+    before=dict(store)
+    assert state['read']()=={'status':'pending','detail':None}
+    assert state['calls']==0 and store==before
+
+
+def test_read_reuses_saved_detail_but_rechecks_access_and_sources(endpoint):
+    run,state,_=endpoint
+    saved=run()
+    assert state['read']()=={'status':'ready','detail':saved}
+    assert state['read']()['status']=='ready' and state['calls']==1
+    with pytest.raises(HTTPException) as denied:state['read']('other')
+    assert denied.value.status_code==404
+    state['active']=False
+    with pytest.raises(HTTPException) as changed:state['read']()
+    assert changed.value.status_code==409 and state['calls']==1
+
+
+def test_read_failure_does_not_fall_back_to_model(endpoint,monkeypatch):
+    from redis.exceptions import RedisError
+    _,state,_=endpoint
+    def unavailable(*args):raise RedisError('offline')
+    monkeypatch.setattr(security.redis,'get',unavailable)
+    with pytest.raises(HTTPException) as error:state['read']()
+    assert error.value.status_code==503 and state['calls']==0

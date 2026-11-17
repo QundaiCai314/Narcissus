@@ -306,7 +306,7 @@ export function MindMap({
       </div>
       {node ? (
         <section className="learning-explanation">
-          <span className="eyebrow">{directoryOnly?'目录位置':node.parent_id ? "知识点详解" : "知识导航"}</span>
+          <span className="eyebrow">{directoryOnly?'目录结构 · 未读取正文':node.parent_id ? "知识点详解" : "知识导航"}</span>
           <h3>{node.title}</h3>
           {directoryOnly?<>
             <p className="muted">{row.outline?.source_name}{node.directory?.toc_pdf_page?` · 目录位于PDF第${node.directory.toc_pdf_page}页`:''}{node.directory?.printed_page?` · 书内第${node.directory.printed_page}页`:''}</p>

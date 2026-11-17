@@ -42,4 +42,12 @@ JSON导出保留文件身份和校准快照，目录快照只代表目录事实�
 
 `POST /api/learning/{set_id}/pdf-page-metadata`核对原文件元数据；`POST /api/learning/{set_id}/page-mapping/preview`预览校准；`POST /api/learning/{set_id}/page-mapping`确认保存。仅目录导图所有者可用，不创建Document、不写对象存储或向量库。
 
+## 知识点详解与原文依据
+
+目录节点只展示目录事实，不生成正文讲解。正文知识点打开时先调用`GET /api/learning/{set_id}/nodes/{node_id}/explanation`，只查询有效缓存或生成进度，不调用模型。没有已保存讲解时，用户点击“生成原文详解”才发送同路径POST。生成失败后重试也必须显式点击，不因重访、轮询或缓存服务故障自动重发生成。
+
+GET与POST均复核所有权、导图类型、来源有效性及片段所属文档。Redis缓存沿用24小时有效期和120秒生成锁；资料失效时已有缓存不能绕过核查。前端切换节点丢弃过期响应，重访重新查询服务端，不长期持有已完成的Promise。生成中的其他访问只轮询GET，不启动第二次生成。
+
+讲解引用按钮和原文依据列表在同一面板展开保存时的片段。有效PDF引用在明确点击后使用引用的文件版本及物理页码内嵌预览，不另开窗口，也不把印刷页码套用到PDF。无精确PDF页码的来源继续使用原文核对对话框。失效来源只展示带提示的片段快照，不提供当前原文跳转。此功能检查使用模拟文本与人工空白PDF，不能代表已验证教材正文讲解质量。
+
 验证：`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=backend python -m pytest backend/tests/test_pdf_outline.py -q`。
