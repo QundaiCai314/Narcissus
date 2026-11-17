@@ -1,5 +1,6 @@
 "use client";
 import {useCallback,useEffect,useRef,useState} from "react";
+import {ResearchFollowup} from './research-followup';
 import {Globe,Search,RefreshCw,ExternalLink,ChevronLeft} from "lucide-react";
 import {api,post,errorText,Document,Page} from "@/lib/api";
 import {Candidate,Research,Capabilities,ReportLink,researchStatus} from "@/lib/research";
@@ -43,6 +44,7 @@ export function ResearchPanel({notebookId,docs,onImported,onReport,onAsk,onSourc
           <div className="research-task-heading"><h3>{task.question}</h3><span>{researchStatus[task.status]}</span><button className="icon-button" title="刷新研究" onClick={()=>run(refresh)}><RefreshCw size={16}/></button></div>
           {task.params.requirements&&<p>{task.params.requirements}</p>}{task.queries.length>0&&<p className="research-muted">本次检索词：{task.queries.join("；")} · 已记录 {task.usage.length} 次调用尝试</p>}
           {task.error&&<p className="message-error">{task.error}</p>}
+          {task.status==='complete'&&<ResearchFollowup key={task.id} id={task.id} onOpen={id=>void run(()=>switchTask(id))}/>}
           <div className="research-actions">{["failed","cancelled"].includes(task.status)&&<button className="button" disabled={busy} onClick={()=>run(async()=>{setTask(await api(`/research/${task.id}/retry`,post()));})}>重试／恢复</button>}{task.status!=="cancelled"&&<button className="button" disabled={busy} onClick={()=>run(async()=>{setTask(await api(`/research/${task.id}/cancel`,post()));})}>取消后续工作</button>}<button className="text-button" disabled={busy} onClick={()=>run(async()=>{if(confirm("删除此研究记录及预览？已导入资料与已保存报告会保留。")){await api(`/research/${task.id}`,{method:"DELETE"});setTask(undefined);setPreview(undefined);}})}>删除研究记录</button></div>
           {preview?<div className="research-preview"><button className="text-button" onClick={()=>{if(!dirty||confirm("修改尚未导入，确定返回？")){setPreview(undefined);setDirty(false);}}}><ChevronLeft size={16}/>返回搜索结果</button><h3>确认网页正文</h3><p>{preview.domain} · 获取时间：{preview.fetched_at?new Date(preview.fetched_at).toLocaleString("zh-CN"):"未获取"}</p><a href={preview.url} target="_blank" rel="noopener noreferrer">打开原网页 <ExternalLink size={13}/></a>{preview.details?.warnings?.map(w=><p key={w} className="research-muted">{w}</p>)}
             <label>标题<input value={title} maxLength={240} onChange={e=>{setTitle(e.target.value);setDirty(true);}}/></label><label>正文快照<textarea value={body} maxLength={500000} onChange={e=>{setBody(e.target.value);setDirty(true);}}/></label><p className="research-muted">{dirty?"正文已调整，将保留原始获取快照并标注用户修改。":"搜索摘要不参与报告；请确认正文完整后导入。"}</p><button className="button primary" disabled={busy||task.status!=="complete"||body.length<100} onClick={()=>run(()=>importOne(preview,true))}>{preview.existing_document_id?"使用笔记本已有资料":"确认导入笔记本"}</button>

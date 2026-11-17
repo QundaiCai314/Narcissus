@@ -1,0 +1,22 @@
+.parity-tool-body { display: flex; flex-direction: column; gap: 16px; }
+.parity-tool-body > p { margin: 0; line-height: 1.8; max-width: 65ch; }
+.parity-tool-body > label { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; color: var(--ink-secondary); font-size: 14px; }
+.parity-tool-body select { width: 100%; max-width: 560px; }
+.parity-tool-body > label:has(input[type="checkbox"]) { flex-direction: row; align-items: flex-start; padding: 16px; border: 1px solid var(--line); background: var(--soft); border-radius: 4px; }
+.parity-tool-body > .button { align-self: flex-start; }
+.parity-tool-body video { width: 100%; max-height: 400px; border: 1px solid var(--line); border-radius: 4px; background: var(--soft); }
+.parity-library { max-width: 960px; }
+.parity-library h1 { font: 500 30px/1.4 var(--serif); margin: 0 0 16px; }
+.parity-library > p { max-width: 65ch; color: var(--muted); margin: 0 0 24px; }
+.parity-library > label { max-width: 480px; margin: 24px 0; color: var(--ink-secondary); }
+.parity-library > article { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 20px 0; background: transparent; border-top: 1px solid var(--line); border-radius: 0; }
+.parity-library > article > span { flex: 1; min-width: 240px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.parity-library > section { padding: 24px; margin-top: 24px; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; }
+.parity-library > section h2 { font: 500 20px/1.6 var(--serif); margin: 0 0 20px; }
+.parity-library audio { display: block; width: 100%; margin-bottom: 16px; }
+.source-correction { display: grid; gap: 12px; }
+.source-correction > details { padding: 12px; background: var(--soft); border-radius: 4px; }
+.source-correction textarea { width: 100%; }
+.source-correction > p { margin: 0; }
+.sharing-popover > p, .sharing-popover > label { margin: 16px 0; }
+@media(max-width:680px) { .parity-library { padding: 32px 20px; } .parity-tool-body { padding: 20px; } .parity-tool-body select { min-width: 0; } }

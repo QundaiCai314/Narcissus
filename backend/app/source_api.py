@@ -47,7 +47,9 @@ def outline_preview_status(notebook_id:str,job_id:str,user=Depends(current_user)
     return result
 
 EXTENSIONS = {".pdf": "pdf", ".docx": "docx", ".txt": "text", ".md": "markdown", ".markdown": "markdown", ".png": "image", ".jpg": "image", ".jpeg": "image"}
+EXTENSIONS.update({'.csv':'csv','.pptx':'pptx','.srt':'subtitle','.vtt':'subtitle'})
 MIMES = {"pdf": "application/pdf", "image": "image/png", "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text": "text/plain", "markdown": "text/plain", "paste": "text/plain", "web": "text/plain"}
+MIMES.update(csv='text/csv',pptx='application/vnd.openxmlformats-officedocument.presentationml.presentation',subtitle='text/plain')
 
 
 def serialize(doc, db=None, ver_map=None, job_map=None):
@@ -164,7 +166,7 @@ def upload(notebook_id: str, file: UploadFile = File(...), keep_copy: bool = Fal
     title = re.sub(r"[\x00-\x1f\x7f]", "", (file.filename or "资料").replace("\\", "/").split("/")[-1])[:240]
     kind = EXTENSIONS.get(PurePosixPath(title.lower()).suffix)
     if not kind:
-        fail(422, "unsupported_file", "支持 PDF、DOCX、TXT、Markdown、PNG 和 JPG；旧版 DOC 请先另存为 DOCX")
+        fail(422, "unsupported_file", "支持PDF、DOCX、TXT、Markdown、PNG/JPG、CSV、PPTX和SRT/VTT字幕；旧版DOC/PPT请先另存为新版格式")
     raw = file.file.read(settings().max_upload_mb*1024*1024+1)
     if not raw:
         fail(422, "empty_file", "文件为空")

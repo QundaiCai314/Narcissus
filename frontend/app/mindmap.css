@@ -78,6 +78,7 @@
 .node-evidence-pdf .pdf-canvas-scroll { max-height: 480px; overflow: auto; }
 .node-detail-content { min-width: 0; }
 .mindmap-reading-status { margin: 8px 0; font-size: 12px; }
+.sharing-popover { position: fixed; inset: 64px 16px auto auto; width: min(480px,calc(100vw - 32px)); max-height: calc(100dvh - 96px); overflow: auto; padding: 24px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); z-index: 100; box-shadow: 0 8px 32px var(--green-glow); }
 .outline-entries { list-style: none; padding: 0; }
 .outline-entries li { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
 .outline-number { font-size: 12px; color: var(--green); }

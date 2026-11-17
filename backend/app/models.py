@@ -8,6 +8,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     UniqueConstraint,
+    CheckConstraint,
     JSON,
     Boolean,
     LargeBinary,
@@ -54,6 +55,15 @@ class Notebook(Base):
         DateTime(timezone=True), default=now, index=True
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class NotebookMember(Base):
+    __tablename__='notebook_members'
+    __table_args__=(CheckConstraint("role IN ('viewer','editor')",name='ck_notebook_member_role'),)
+    notebook_id:Mapped[str]=mapped_column(ForeignKey('notebooks.id',ondelete='CASCADE'),primary_key=True)
+    user_id:Mapped[str]=mapped_column(ForeignKey('users.id',ondelete='CASCADE'),primary_key=True)
+    role:Mapped[str]=mapped_column(String(16))
+    created_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),default=now)
 
 
 class Document(Base):

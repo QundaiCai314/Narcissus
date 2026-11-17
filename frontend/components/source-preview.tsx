@@ -3,6 +3,9 @@ import {useCallback,useEffect,useRef,useState} from "react";
 import {api,post,errorText} from "@/lib/api";
 import {SourcePointer,SourceSnapshot,sourceNames,sourcePosition,importStates} from "@/lib/sources";
 import {PdfPreview} from "./pdf-preview";
+import {SourceCorrection} from './source-correction';
+import {ocrRisks} from '@/lib/ocr-risks';
+import {MarkdownRenderer} from './markdown-renderer';
 
 export function SourcePreview({pointer,onChanged,onDirty}:{pointer:SourcePointer;onChanged:()=>void;onDirty:(v:boolean)=>void}){
  const [version,setVersion]=useState(pointer.version),[data,setData]=useState<SourceSnapshot|null>(null),[error,setError]=useState(""),[busy,setBusy]=useState(false),[editing,setEditing]=useState(false),[dirty,setDirty]=useState(false),[title,setTitle]=useState(""),[text,setText]=useState(""),[corrections,setCorrections]=useState<Record<string,string>>({}),[partial,setPartial]=useState(false),[copy,setCopy]=useState(false),[page,setPage]=useState(pointer.page||1);
@@ -20,7 +23,7 @@ export function SourcePreview({pointer,onChanged,onDirty}:{pointer:SourcePointer
  if(!data)return <section className="import-panel">{error?<><p role="alert">{error}</p><button className="button" onClick={()=>load().catch(e=>setError(errorText(e)))}>重新加载</button></>:"正在加载原文…"}</section>;
  const pending=data.status==="awaiting_confirmation",latest=data.versions[0].version===data.version;
  const ocr=data.source_type==="pdf"||data.source_type==="image";
- const editable=latest&&["ready","failed","cancelled"].includes(data.status)&&(ocr?data.units.some(u=>u.ocr):data.source_type!=="docx");
+ const editable=latest&&["ready","failed","cancelled"].includes(data.status)&&(ocr?data.units.some(u=>u.ocr):['paste','text','markdown','web'].includes(data.source_type));
  const file=`/api/documents/${data.document_id}/file?version=${data.version}`;
  return <section className="source-preview"><header><div><small>{sourceNames[data.source_type]} · {importStates[data.status]}</small><h2>{data.title}</h2></div><label>来源版本<select value={data.version} disabled={dirty||busy} onChange={e=>{setVersion(Number(e.target.value));setEditing(false);setPage(1);}}>{data.versions.map(v=><option key={v.version} value={v.version}>版本 {v.version} · {importStates[v.status]}</option>)}</select></label></header>
   {data.changed&&data.status==="ready"&&<p className="source-warning">资料已更新，当前展示引用所依据的历史版本。</p>}
@@ -42,7 +45,8 @@ export function SourcePreview({pointer,onChanged,onDirty}:{pointer:SourcePointer
    {ocr&&<div className="source-original">{data.source_type==="pdf"?<><label className="pdf-toolbar">原件页码<input type="number" min={1} max={data.details.pages||100} value={page} onChange={e=>setPage(Math.max(1,Math.min(data.details.pages||100,Number(e.target.value)||1)))}/></label><PdfPreview documentId={data.document_id} version={data.version} page={page} filename={data.title}/></>:<img src={file} alt="上传的原始图片"/>}</div>}
    <div className="source-body">{!ocr&&(editing||(pending&&data.source_type==="web"))?<><textarea aria-label="资料正文" rows={20} maxLength={500000} value={text} disabled={busy} onChange={e=>{setText(e.target.value);setDirty(true);}}/><small>{text.length.toLocaleString()} / 500,000 字</small></>:data.units.map(u=><div key={u.id} ref={pointer.location?.block_id===u.location.block_id?target:undefined} className={pointer.location?.block_id===u.location.block_id?"source-unit cited":"source-unit"}>
     <small>{u.location.heading&&`${u.location.heading} · `}{u.location.label}{u.confidence!==undefined&&` · 识别置信度 ${u.confidence}%`}{u.user_corrected&&" · 用户已修正"}</small>
-    {editing&&u.ocr?<textarea aria-label={`修正${u.location.label}`} rows={8} value={corrections[u.id]??u.text} onChange={e=>{setCorrections(v=>({...v,[u.id]:e.target.value}));setDirty(true);}}/>:<p>{u.text}</p>}
+    {u.ocr&&!u.user_corrected&&ocrRisks(u.text).map(t=><p className="source-warning" key={t}>{t}</p>)}
+    {editing&&u.ocr?<SourceCorrection label={`修正${u.location.label}`} value={corrections[u.id]??u.text} onChange={text=>{setCorrections(v=>({...v,[u.id]:text}));setDirty(true);}}/>:u.user_corrected?<MarkdownRenderer content={u.text}/>:<p>{u.text}</p>}
     {u.location.page&&<button className="text-button" onClick={()=>setPage(u.location.page!)}>查看第 {u.location.page} 页原件</button>}
    </div>)}{!data.units.length&&<p className="muted">{data.status==="failed"?"没有可显示的正文，请重试或粘贴文字。":"正文尚未解析完成。"}</p>}</div>
   </div>

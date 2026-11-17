@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import {InstallApp} from '@/components/install-app';
 import "./globals.css";
 import "./editorial.css";
 import "./study.css";
 import "./composer.css";
 import "./mindmap.css";
+import "./parity.css";
 
 export const metadata: Metadata = {
   title: "Narcissus · 从阅读到理解",
@@ -13,7 +15,7 @@ export const metadata: Metadata = {
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-CN">
-      <body>{children}</body>
+      <body><InstallApp/>{children}</body>
     </html>
   );
 }

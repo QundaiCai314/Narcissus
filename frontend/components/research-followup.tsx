@@ -1,0 +1,11 @@
+"use client";
+import {useRef,useState} from 'react';
+import {api,post,errorText} from '@/lib/api';
+type Plan={available:boolean;reason?:string;remaining_rounds:number;used_rounds:number;fingerprint:string;notice:string;gaps:{id:string;text:string;query:string}[]};
+export function ResearchFollowup({id,onOpen}:{id:string;onOpen:(id:string)=>void}){
+ const [plan,setPlan]=useState<Plan|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[confirmed,setConfirmed]=useState(false),[gap,setGap]=useState('');
+ const request=useRef<{signature:string;key:string}|null>(null);
+ async function preview(){setBusy(true);setError('');setConfirmed(false);try{const value=await api<Plan>(`/research/${id}/gap-plan`);setPlan(value);setGap(value.gaps?.[0]?.id||'');}catch(e){setError(errorText(e));}finally{setBusy(false);}}
+ async function search(){if(!plan||!confirmed)return;setBusy(true);setError('');const signature=plan.fingerprint+gap;if(request.current?.signature!==signature)request.current={signature,key:crypto.randomUUID()};try{const row=await api<{id:string}>(`/research/${id}/follow-up`,post({request_key:request.current.key,gap_id:gap,fingerprint:plan.fingerprint,confirmed:true}));onOpen(row.id);}catch(e){setError(errorText(e));}finally{setBusy(false);}}
+ return <section className="directory-coverage"><h3>追查证据缺口</h3><p className="muted">从已复核报告中整理尚未回答的问题；预览不调用模型或搜索。</p><button className="button" disabled={busy} onClick={()=>void preview()}>检查报告缺口与轮数预算</button>{error&&<p role="alert">{error}</p>}{plan&&(plan.available?<><p>{plan.notice} 已使用{plan.used_rounds}/3轮。</p>{!plan.gaps.length?<p>当前没有可继续检索的已复核缺口。</p>:<><label>选择本轮缺口<select aria-label="选择证据缺口" value={gap} onChange={e=>{setGap(e.target.value);setConfirmed(false);}}>{plan.gaps.map(g=><option key={g.id} value={g.id}>{g.text}</option>)}</select></label><p className="source-snapshot">检索词：{plan.gaps.find(g=>g.id===gap)?.query}</p><label><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>确认执行一轮搜索，可能计费</label><button className="button" disabled={busy||!confirmed||!gap||!plan.remaining_rounds} onClick={()=>void search()}>确认补检索</button></>}</>:<p>{plan.reason}</p>)}</section>;
+}

@@ -174,9 +174,9 @@ export function useWorkspace(id: string) {
   function toggle(docId: string) {
     const base =
       selected ?? docs.filter((d) => d.status === "ready").map((d) => d.id);
-    setSelected(
-      base.includes(docId) ? base.filter((x) => x !== docId) : [...base, docId],
-    );
+    const next=base.includes(docId)?base.filter(x=>x!==docId):[...base,docId];
+    if(next.length>10){setError('单次选择最多10份资料，请先清空选择再勾选本次要用的资料。');return;}
+    setSelected(next);
   }
   async function generate(
     retryId?: string,
@@ -187,6 +187,7 @@ export function useWorkspace(id: string) {
     },
   ) {
     if (busy || (!retryId && !(preset?.question ?? question).trim())) return;
+    if(!retryId&&((preset?.source_ids??selected)?.length??0)>10){setError('本次选中资料超过10份，请调整选择。');return;}
     const text = (preset?.question ?? question).trim();
     setBusy(true);
     setError("");

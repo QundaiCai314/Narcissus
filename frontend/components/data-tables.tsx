@@ -1,0 +1,14 @@
+"use client";
+import {useEffect,useRef,useState} from 'react';
+import {api,errorText} from '@/lib/api';
+import type {SourcePointer} from '@/lib/sources';
+type Brief={id:string;document_id:string;filename:string;version:number;rows:number;columns:number};
+type Table={rows:{cells:string[];unit_id:string;location:{block_id:string;label:string}}[]} & Omit<Brief,'rows'>;
+export function DataTables({notebookId,onCitation}:{notebookId:string;onCitation:(pointer:SourcePointer)=>void}){
+ const [items,setItems]=useState<Brief[]>([]),[value,setValue]=useState<Table|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(true);
+ useEffect(()=>{let active=true;api<{items:Brief[]}>(`/notebooks/${notebookId}/data-tables`).then(v=>{if(active)setItems(v.items);}).catch(e=>{if(active)setError(errorText(e));}).finally(()=>{if(active)setBusy(false);});return()=>{active=false;};},[notebookId]);
+ const selection=useRef(0);
+ useEffect(()=>()=>{selection.current++;},[]);
+ async function open(index:string){const revision=++selection.current;setValue(null);setError('');if(!index){setBusy(false);return;}const row=items[Number(index)];setBusy(true);try{const result=await api<Table>(`/documents/${row.document_id}/tables/${row.id}`);if(selection.current===revision)setValue(result);}catch(e){if(selection.current===revision)setError(errorText(e));}finally{if(selection.current===revision)setBusy(false);}}
+ return <section className="writing-area parity-tool"><div className="writing-heading"><h2>来源数据表</h2></div><div className="writing-scroll parity-tool-body"><p className="muted">展示已确认CSV与PPTX原生表格，保留原始文字和位置；不推算或补造数值。首行按列标题展示。</p><label>选择来源表格<select aria-label="选择来源表格" onChange={e=>void open(e.target.value)} defaultValue=""><option value="">请选择…</option>{items.map((item,i)=><option key={item.document_id+item.id} value={i}>{item.filename} · {item.id} · {item.rows}行×{item.columns}列</option>)}</select></label>{busy&&<p role="status">正在读取表格…</p>}{error&&<p role="alert">{error}</p>}{!busy&&!items.length&&<p>暂无结构化表格。上传CSV或PPTX并核对入库后可在这里查看。</p>}{value&&<><div className="learning-toolbar"><a className="button" href={`/api/documents/${value.document_id}/table-exports/${value.id}/csv`}>下载CSV</a><a className="button" href={`/api/documents/${value.document_id}/table-exports/${value.id}/xlsx`}>下载Excel</a><span className="muted">来源版本{value.version}</span></div><div className="directory-coverage-table"><table><thead><tr>{value.rows[0]?.cells.map((c,i)=><th key={i}>{c||`第${i+1}列`}</th>)}<th>依据</th></tr></thead><tbody>{value.rows.slice(1).map(row=><tr key={row.unit_id}>{row.cells.map((c,i)=><td key={i}>{c}</td>)}<td><button className="text-button" onClick={()=>onCitation({document_id:value.document_id,filename:value.filename,version:value.version,location:row.location})}>{row.location.label}</button></td></tr>)}</tbody></table></div></>}</div></section>;
+}

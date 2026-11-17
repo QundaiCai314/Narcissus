@@ -9,7 +9,9 @@ from starlette.datastructures import Headers
 from .config import settings
 from .db import SessionLocal
 from .security import redis
-from . import auth, notebooks, documents, conversations, qa, storage, writings, exports, learning, audio, research, visuals
+from . import auth, notebooks, documents, conversations, qa, storage, writings, exports, learning, audio, research, visuals, data_tables
+from . import research_gaps
+from . import sharing
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s"
@@ -169,6 +171,9 @@ for router in (
     audio.router,
     research.router,
     visuals.router,
+    data_tables.router,
+    research_gaps.router,
+    sharing.router,
 ):
     app.include_router(router, prefix="/api")
 

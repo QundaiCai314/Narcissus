@@ -14,6 +14,7 @@ import {DirectoryPageMapping} from './directory-page-mapping';
 import {layoutMindmap,mindmapSvg,revealPath} from '@/lib/mindmap-layout';
 import {fitCamera,graphSignature,progressKey,readPosition,resizeCamera,type ViewportSize,type ReadingPosition} from '@/lib/mindmap-progress';
 import {useMindmapOwner} from '@/hooks/use-mindmap-owner';
+import {mindmapHtml,repeatedTopics} from '@/lib/mindmap-sharing';
 function overview(items: LearningItem[]) {
   const root = items.find((item) => !item.parent_id);
   return new Set(items.filter((item) => item.parent_id && item.directory?.kind!=='part' && (items.length > 24 || item.parent_id !== root?.id)).map((item) => item.id));
@@ -48,6 +49,7 @@ export function MindMap({
   const storageKey=progressKey(owner.id||undefined,notebookId,row.id,row.version);
   const signature=graphSignature(row.items||[]);
   const [loaded,setLoaded]=useState<string|null>(null),[progress,setProgress]=useState('');
+  const [shareStatus,setShareStatus]=useState('');
   const activeIdentity=storageKey?storageKey+signature:null;
   const hydrated=useRef(false),write=useRef<()=>void>(()=>{});
   const directoryOnly=row.params.origin==='outline';
@@ -149,13 +151,18 @@ export function MindMap({
     if(!pendingFocus||!layout.nodes.some(item=>item.node.id===pendingFocus))return;
     fit();setPendingFocus(null);
   },[pendingFocus,layout.nodes,fit]);
-  function download(format:'json'|'svg') {
+  function download(format:'json'|'svg'|'html') {
     const styles=getComputedStyle(document.documentElement);
     const colors={paper:styles.getPropertyValue('--paper').trim(),ink:styles.getPropertyValue('--ink').trim(),line:styles.getPropertyValue('--line').trim(),accent:styles.getPropertyValue('--green').trim()};
     const directoryEntries=directoryOnly?(row.directory_reference?.entries||(row.items||[]).filter(item=>item.directory).map(item=>({...item.directory,id:item.id,parent_id:item.parent_id==='__outline_root__'?null:item.parent_id}))):undefined;
-    const content=format==='svg'?mindmapSvg(row.items||[],row.title,colors):JSON.stringify({title:row.title,items:row.items,outline:row.outline,entries:directoryEntries,directory_reference:row.directory_reference,directory_coverage:row.directory_coverage,source_pdf:row.directory_reference?.source_pdf,page_mapping:row.page_mapping,page_locations:row.page_locations,source_name:row.outline?.source_name,pages_read:row.outline?.pages_read,unparsed_lines:[],warnings:[]},null,2);
-    const url=URL.createObjectURL(new Blob([content],{type:format==='svg'?'image/svg+xml;charset=utf-8':'application/json;charset=utf-8'}));
-    const link=document.createElement('a');link.href=url;link.download=`narcissus-mindmap.${format}`;link.click();URL.revokeObjectURL(url);
+    const content=format==='html'?mindmapHtml(row.items||[],row.title):format==='svg'?mindmapSvg(row.items||[],row.title,colors):JSON.stringify({title:row.title,items:row.items,outline:row.outline,entries:directoryEntries,directory_reference:row.directory_reference,directory_coverage:row.directory_coverage,source_pdf:row.directory_reference?.source_pdf,page_mapping:row.page_mapping,page_locations:row.page_locations,source_name:row.outline?.source_name,pages_read:row.outline?.pages_read,unparsed_lines:[],warnings:[]},null,2);
+    const url=URL.createObjectURL(new Blob([content],{type:format==='html'?'text/html;charset=utf-8':format==='svg'?'image/svg+xml;charset=utf-8':'application/json;charset=utf-8'}));
+    const link=document.createElement('a');link.href=url;link.download=`narcissus-mindmap.${format}`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
+  async function share(){
+    const file=new File([mindmapHtml(row.items||[],row.title)],'narcissus-mindmap.html',{type:'text/html'});
+    try{if(navigator.canShare?.({files:[file]})){await navigator.share({files:[file],title:row.title});setShareStatus('已打开系统分享');}else{download('html');setShareStatus('已下载只读HTML，可将文件发给他人；不授予笔记本访问权限。');}}
+    catch(error){if(!(error instanceof Error&&error.name==='AbortError'))setShareStatus('系统分享不可用，请下载只读HTML文件。');}
   }
   function zoom(factor: number) {
     focusTarget.current=null;
@@ -234,8 +241,12 @@ export function MindMap({
         </span>
         <button className="text-button" onClick={()=>download('svg')}>下载完整SVG</button>
         <button className="text-button" onClick={()=>download('json')}>下载导图JSON</button>
+        <button className="text-button" onClick={()=>download('html')}>下载只读HTML</button>
+        <button className="text-button" onClick={()=>void share()}>分享导图</button>
       </div>
       {progress&&<p className="mindmap-reading-status muted" role="status">{progress}</p>}
+      {shareStatus&&<p className="muted" role="status">{shareStatus}</p>}
+      <details className="directory-coverage"><summary>主题分类核对</summary><p className="muted">自动检查只能发现同名主题，不能判定分类语义正确；跨章节重复概念也可能合理，需人工核对原文。</p>{repeatedTopics(row.items||[]).length?repeatedTopics(row.items||[]).map(item=><p key={item.title}>{item.title}出现在不同分支：{item.ids.map((id,i)=><button className="text-button" key={id} onClick={()=>focusNode(id)}>位置{i+1}</button>)}</p>):<p className="muted">未发现需提示的跨分支同名主题。此结果不代表分类已通过语义审核。</p>}</details>
       <div className="mindmap-search">
         <input aria-label="搜索导图节点" placeholder="搜索章节或知识点…" value={query} onChange={event=>setQuery(event.target.value)}/>
         {query.trim()&&<div aria-label="节点搜索结果">{(row.items||[]).filter(item=>(item.title||'').toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())).slice(0,20).map(item=><button className="text-button" key={item.id} onClick={()=>{focusNode(item.id);setQuery('');}}>{item.title}</button>)}

@@ -42,7 +42,8 @@ class Settings(BaseSettings):
     model_timeout_seconds: int = 60
     generation_timeout_seconds: int = 180
     retrieval_max_distance: float = 0.55
-    max_files: int = 10
+    max_files: int = 50
+    collaboration_enabled: bool = False
     max_upload_mb: int = 200
     max_pdf_pages: int = 100
     max_document_chars: int = 500000

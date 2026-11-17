@@ -32,6 +32,9 @@ import { Brand, Header, Loading, ErrorNotice } from "@/components/shared";
 import { ChatMessage } from "@/components/message";
 import { SourceImport } from "@/components/source-import";
 import { SourcePreview } from "@/components/source-preview";
+import {DataTables} from '@/components/data-tables';
+import {VideoOverview} from '@/components/video-overview';
+import {SharingManager} from '@/components/sharing-manager';
 import { sourceNames, importStates } from "@/lib/sources";
 import { GuidePanel } from "@/components/guide-panel";
 import { WritingPanel } from "@/components/writing-panel";
@@ -61,8 +64,10 @@ export default function Workspace({
 }) {
   const { id } = use(params);
   const [mobilePanel, setMobilePanel] = useState<"sources" | "chat" | "studio">("chat");
+  const [sourceLimit,setSourceLimit]=useState<number|null>(null);
+  useEffect(()=>{api<{max_files:number}>('/import-limits').then(value=>setSourceLimit(value.max_files)).catch(()=>{});},[]);
   const [view, setView] = useState<
-    "chat" | "guide" | "note" | "summary" | "learning" | "audio" | "research" | "presentation" | "infographic"
+    "chat" | "guide" | "note" | "summary" | "learning" | "audio" | "research" | "presentation" | "infographic" | "table" | "video"
   >("chat");
   const [guideDoc, setGuideDoc] = useState(""),
     [noteId, setNoteId] = useState(""),
@@ -119,10 +124,15 @@ export default function Workspace({
   } = useWorkspace(id);
   const chosenSources = docs.filter(d => d.status === "ready" && (selected === null || selected.includes(d.id))).map(d => d.id);
   function openStudio(kind: StudioKind, itemId?: string, documentId?: string | null, pushState: boolean = true) {
+    if(!itemId&&chosenSources.length>10&&['quiz','mindmap','flashcards','summary','audio','presentation','infographic'].includes(kind)){setError('每次创作最多使用10份资料，请在左侧清空选择后勾选本次要用的资料。');return;}
     if (learningDirty.current && !window.confirm("当前作答尚未保存，切换会放弃这些修改。仍要切换吗？")) return;
     const request = { key: ++requestSequence.current, id: itemId, documentIds: chosenSources };
     if (kind === "presentation") { setPresentationRequest(request); setView("presentation");
     } else if (kind === "infographic") { setInfographicRequest(request); setView("infographic");
+    } else if(kind==='video'){
+      setView('video');
+    } else if(kind==='table'){
+      setView('table');
     } else if (kind === "research") {
       setView("research");
     } else if (kind === "guide") {
@@ -233,6 +243,7 @@ export default function Workspace({
   return (
     <div className="workspace-shell" data-mobile-panel={mobilePanel}>
       <Header>
+        <SharingManager notebookId={id}/>
         <Link href="/" className="back-link">
           <ArrowLeft size={16} />
           全部笔记本
@@ -268,13 +279,13 @@ export default function Workspace({
         <aside className="sources-panel">
           <div className="panel-title">
             <h2>
-              资料<span>{docs.length}/10</span>
+              资料<span>{docs.length}/{sourceLimit??'…'}</span>
             </h2>
             <FileText size={17} />
           </div>
           <p className="panel-description">你的答案，从这些资料开始。</p>
           <button className="upload-button" onClick={() => setAdding(true)}><Plus size={18}/>添加资料</button>
-          <p className="upload-hint">PDF · Word · 文字 · 网页 · 图片<br/>支持中文图片文字识别</p>
+          <p className="upload-hint">PDF · Word · CSV · PPTX · 字幕<br/>文字 · 网页 · 图片</p>
           <label className="all-sources">
             <input
               type="checkbox"
@@ -283,6 +294,7 @@ export default function Workspace({
             />
             使用全部可用资料
           </label>
+          {docs.filter(d=>d.status==='ready').length>10&&<p className="upload-hint">每次创作最多选10份资料。<button className="text-button" onClick={()=>setSelected([])}>清空选择</button></p>}
           <div className="document-list">
             {docs.length === 0 ? (
               <div className="source-empty">
@@ -538,7 +550,7 @@ export default function Workspace({
         {view !== "chat" && !dockedMindmap && (
           <>
             <div className="studio-detail-heading">
-              {view === "learning" && quizFocused ? <Brand onNavigate={() => !learningDirty.current || window.confirm("当前作答尚未保存，返回主页会放弃这些修改。仍要离开吗？")} /> : <span className="studio-modal-title">{{ presentation:"演示文稿", infographic:"信息图", research: "联网研究", guide: "资料导读", note: "笔记", summary: "总结", learning: "主动学习", audio: "音频概览", chat: "对话" }[view]}</span>}
+              {view === "learning" && quizFocused ? <Brand onNavigate={() => !learningDirty.current || window.confirm("当前作答尚未保存，返回主页会放弃这些修改。仍要离开吗？")} /> : <span className="studio-modal-title">{{ video:"视频概览", table:"来源数据表", presentation:"演示文稿", infographic:"信息图", research: "联网研究", guide: "资料导读", note: "笔记", summary: "总结", learning: "主动学习", audio: "音频概览", chat: "对话" }[view]}</span>}
               <button aria-label={view === "learning" && quizFocused ? "返回对话" : "关闭弹窗"} className={view === "learning" && quizFocused ? "study-return" : "studio-close"} onClick={() => closeStudio()}>
                 {view === "learning" && quizFocused ? <span className="study-return-icon"><ArrowLeft size={16} aria-hidden="true" /></span> : <X size={16} />}
                 {view === "learning" && quizFocused && <span>返回对话</span>}
@@ -588,6 +600,8 @@ export default function Workspace({
             )}
             {view === "learning" && learningContent}
             {view === "audio" && <AudioPanel notebookId={id} docs={docs} studioRequest={audioRequest} onCitation={setPreview}/>}
+            {view === "table" && <DataTables notebookId={id} onCitation={setPreview}/>}
+            {view === "video" && <VideoOverview notebookId={id}/>}
           </>
         )}
       </WorkspaceDialog>

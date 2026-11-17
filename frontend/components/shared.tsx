@@ -60,6 +60,7 @@ export function Header({ children }: { children?: React.ReactNode }) {
           onClick={async () => {
             try {
               await api("/auth/logout", post());
+              try{localStorage.removeItem('narcissus.offline-owner');}catch{}
               router.push("/login");
             } catch {
               window.alert("退出失败，请重试");

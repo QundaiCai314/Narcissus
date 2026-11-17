@@ -103,6 +103,9 @@ def docx_units(data):
 
 
 def parse_file(source_type, data, progress=None, cached=None):
+    if source_type in ('csv','pptx','subtitle'):
+        from .structured_sources import csv_units,pptx_units,subtitle_units
+        return {'csv':csv_units,'pptx':pptx_units,'subtitle':subtitle_units}[source_type](data)
     info = {"method": source_type, "warnings": [], "failed_pages": [], "ocr_pages": [], "ocr_confidence": {}}
     if source_type in ("text", "markdown", "paste"):
         value, encoding = decode_text(data)

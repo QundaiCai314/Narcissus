@@ -22,6 +22,8 @@ import { audioStatus } from "@/lib/audio";
 import { visualStates } from "@/lib/visuals";
 
 export type StudioKind =
+  | "table"
+  | "video"
   | "presentation"
   | "infographic"
   | "research"
@@ -32,6 +34,8 @@ export type StudioKind =
   | LearningKind;
 
 const tools = [
+  { kind: "video", title: "视频概览", icon: Presentation },
+  { kind: "table", title: "来源数据表", icon: FileText },
   { kind: "presentation", title: "演示文稿", icon: Presentation },
   { kind: "infographic", title: "信息图", icon: Image },
   { kind: "research", title: "联网研究", icon: Globe },
@@ -45,6 +49,8 @@ const tools = [
 ] as const;
 
 const synthesizers = [
+  { kind: "video", title: "视频概览", icon: Presentation },
+  { kind: "table", title: "数据表", icon: FileText },
   { kind: "guide", title: "导读", icon: BookOpen },
   { kind: "summary", title: "总结", icon: FileText },
   { kind: "audio", title: "音频概览", icon: Headphones },
