@@ -91,6 +91,14 @@ class Settings(BaseSettings):
     visual_render_timeout: int = 90
     visual_font_path: str = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"
     session_days: int = 7
+    alipay_enabled: bool = False
+    alipay_environment: Literal['sandbox', 'production'] = 'sandbox'
+    alipay_production_config: str = ''
+    alipay_notify_url: str = ''
+    billing_products_json: str = '[]'
+    billing_operator_emails: str = ''
+    billing_credit_costs_json: str = '{}'
+    billing_enforce_credits: bool = False
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_security: Literal["starttls", "ssl"] = "starttls"

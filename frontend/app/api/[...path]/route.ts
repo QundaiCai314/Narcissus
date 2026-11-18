@@ -43,6 +43,8 @@ async function proxy(request: NextRequest) {
       "x-request-id",
       "x-content-type-options",
       "content-security-policy",
+      "referrer-policy",
+      "x-frame-options",
     ]) {
       const value = upstream.headers.get(key);
       if (value) outgoing.set(key, value);

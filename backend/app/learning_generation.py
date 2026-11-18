@@ -340,6 +340,9 @@ def fail_job(set_id, claim, reason, permanent=False, usages=None):
             None,
         )
         row.usage = row.usage + (usages or [])
+        if row.status == 'failed':
+            from .billing_service import restore_credit
+            restore_credit(db, row.request_key)
         db.commit()
     log.warning("learning_failed task_id=%s reason=%s", set_id, reason)
 

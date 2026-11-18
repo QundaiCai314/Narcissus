@@ -1,5 +1,6 @@
 import logging
 import uuid
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
@@ -12,6 +13,7 @@ from .security import redis
 from . import auth, notebooks, documents, conversations, qa, storage, writings, exports, learning, audio, research, visuals, data_tables
 from . import research_gaps
 from . import sharing
+from . import billing
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s"
@@ -23,7 +25,16 @@ log = logging.getLogger("narcissus.api")
 @asynccontextmanager
 async def lifespan(app):
     storage.initialize_bucket()
-    yield
+    billing_task = asyncio.create_task(billing.reconcile_loop()) if settings().alipay_enabled else None
+    try:
+        yield
+    finally:
+        if billing_task:
+            billing_task.cancel()
+            try:
+                await billing_task
+            except asyncio.CancelledError:
+                pass
 
 
 app = FastAPI(
@@ -45,7 +56,8 @@ class RequestGuard:
         request_id = str(uuid.uuid4())
         scope.setdefault("state", {})["request_id"] = request_id
         headers = Headers(scope=scope)
-        if scope["method"] not in ("GET", "HEAD", "OPTIONS"):
+        is_alipay_notification = scope.get('path') == '/api/billing/alipay/notify' and scope['method'] == 'POST'
+        if scope["method"] not in ("GET", "HEAD", "OPTIONS") and not is_alipay_notification:
             origin = headers.get("origin")
             if (origin and origin != settings().public_origin) or headers.get(
                 "x-requested-with"
@@ -174,6 +186,7 @@ for router in (
     data_tables.router,
     research_gaps.router,
     sharing.router,
+    billing.router,
 ):
     app.include_router(router, prefix="/api")
 

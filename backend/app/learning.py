@@ -415,6 +415,8 @@ def enqueue(db, user, nb_id, data, previous=None):
     )
     db.add(row)
     nb.updated_at = now()
+    from .billing_service import consume_credit
+    consume_credit(db, user.id, data.kind, request_key + ':' + request_key)
     db.commit()
     return row
 
@@ -486,6 +488,8 @@ def cancel(set_id: str, user=Depends(current_user), db=Depends(db_session)):
             None,
             "已取消生成",
         )
+        from .billing_service import restore_credit
+        restore_credit(db, row.request_key)
         db.commit()
     return serialize(db, row, user.id, True)
 
@@ -499,6 +503,8 @@ def retry(set_id: str, user=Depends(current_user), db=Depends(db_session)):
     if not valid_sources(db, row):
         fail(409, "source_changed", "资料已更新或删除，请选择当前资料生成新版")
     rate_limit("learning_generation:" + user.id, 30, 3600)
+    from .billing_service import consume_credit
+    consume_credit(db, user.id, row.kind, row.request_key + ':' + uid())
     row.status, row.phase, row.claim, row.attempts = "queued", "queued", None, 0
     row.error, row.warning = None, None
     row.available_at, row.dispatched_at, row.started_at = now(), None, None

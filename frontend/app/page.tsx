@@ -144,6 +144,7 @@ export default function Home() {
         跳到笔记本
       </a>
       <Header>
+        <Link className="button" href="/billing">会员与额度</Link>
         <span className="account">
           <span className="account-initial" aria-hidden="true">
             {email.charAt(0).toUpperCase() || "知"}

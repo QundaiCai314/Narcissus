@@ -8,6 +8,9 @@ node_modules/
 __pycache__/
 .pytest_cache/
 .venv/
+.venv-payment/
+.alipay-sandbox.json
+.alipay-production.json
 *.pyc
 work/
 backups/
