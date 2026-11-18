@@ -1,6 +1,8 @@
 "use client";
 import Link from "next/link";
-import { BookOpen, ArrowUpRight, LoaderCircle, LogOut } from "lucide-react";
+import { ArrowUpRight, LoaderCircle, LogOut } from "lucide-react";
+import { BrandMark } from "@/components/brand-mark";
+import { ProfileLink } from "@/components/profile-link";
 import { api, post } from "@/lib/api";
 import { useRouter } from "next/navigation";
 
@@ -9,9 +11,7 @@ export function Brand({ onNavigate }: { onNavigate?: () => boolean } = {}) {
     <Link className="brand" href="/" aria-label="Narcissus 首页" onNavigate={(event) => {
       if (onNavigate && !onNavigate()) event.preventDefault();
     }}>
-      <span className="brand-icon">
-        <BookOpen size={20} />
-      </span>
+      <span className="brand-icon"><BrandMark /></span>
       <span className="brand-name">Narcissus</span>
     </Link>
   );
@@ -46,13 +46,14 @@ export function PaperStudy() {
     </div>
   );
 }
-export function Header({ children }: { children?: React.ReactNode }) {
+export function Header({ children, profile = true }: { children?: React.ReactNode; profile?: boolean }) {
   const router = useRouter();
   return (
     <header className="topbar">
       <Brand />
       <div className="header-actions">
         {children}
+        {profile && <ProfileLink compact />}
         <button
           className="icon-button"
           title="退出登录"

@@ -29,6 +29,7 @@ import {
   Writing,
 } from "@/lib/api";
 import { Brand, Header, Loading, ErrorNotice } from "@/components/shared";
+import { ProfileLink } from "@/components/profile-link";
 import { ChatMessage } from "@/components/message";
 import { SourceImport } from "@/components/source-import";
 import { SourcePreview } from "@/components/source-preview";
@@ -242,7 +243,7 @@ export default function Workspace({
   );
   return (
     <div className="workspace-shell" data-mobile-panel={mobilePanel}>
-      <Header>
+      <Header profile={false}>
         <SharingManager notebookId={id}/>
         <Link href="/" className="back-link">
           <ArrowLeft size={16} />
@@ -254,9 +255,7 @@ export default function Workspace({
           <BookTitle />
           <h1>{notebook.name}</h1>
         </div>
-        <span>
-          私人笔记本 <span className="dot" />
-        </span>
+        <ProfileLink onNavigate={() => !learningDirty.current || window.confirm("当前作答尚未保存，离开会放弃这些修改。仍要离开吗？")} />
       </div>
       {error && (
         <div className="workspace-error">

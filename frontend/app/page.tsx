@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { api, post, errorText, Notebook, Page } from "@/lib/api";
 import { Header, Loading, ErrorNotice, PaperStudy } from "@/components/shared";
+import { ProfileLink } from "@/components/profile-link";
 import { version } from "../package.json";
 
 type Cleanup = {
@@ -143,14 +144,9 @@ export default function Home() {
       <a className="skip-link" href="#library">
         跳到笔记本
       </a>
-      <Header>
+      <Header profile={false}>
         <Link className="button" href="/billing">会员与额度</Link>
-        <span className="account">
-          <span className="account-initial" aria-hidden="true">
-            {email.charAt(0).toUpperCase() || "知"}
-          </span>
-          <span>{email}</span>
-        </span>
+        <ProfileLink email={email} />
       </Header>
       <div className="library-layout">
         <aside className="library-sidebar">

@@ -8,10 +8,10 @@
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--paper);
-  box-shadow: 0 24px 80px #26352430;
+  box-shadow: 0 24px 80px #51474130;
 }
 .workspace-dialog.studio-modal::backdrop {
-  background: #20291e66;
+  background: #51474166;
   backdrop-filter: blur(5px);
 }
 .studio-modal .studio-detail-heading {
@@ -84,7 +84,7 @@
   border-radius: 12px;
   background: var(--paper);
   color: var(--ink);
-  box-shadow: 0 12px 40px #29352224;
+  box-shadow: 0 12px 40px #51474124;
   overflow: auto;
 }
 .history-popover:popover-open {
@@ -165,7 +165,7 @@
   overflow: hidden;
 }
 .compose-surface:focus-within {
-  border-color: #9ca98c;
+  border-color: var(--color-faint);
 }
 .is-dragging .compose-surface {
   outline: 2px dashed var(--green);
@@ -344,7 +344,7 @@
 .compose-error {
   padding: 10px 12px;
   color: #8a4634;
-  background: #fbf1e9;
+  background: var(--color-canvas);
   font-size: 13px;
   border-radius: 4px;
 }
@@ -382,11 +382,11 @@
   border-radius: 8px;
   background: var(--paper);
   --keyboard-zindex: 200;
-  --keyboard-toolbar-background: #f6f5ed;
-  --keyboard-background: #eceee4;
-  --keycap-background: #fffef9;
-  --keycap-text: #354230;
-  --primary: #506747;
+  --keyboard-toolbar-background: var(--color-canvas);
+  --keyboard-background: var(--color-blue-wash);
+  --keycap-background: var(--color-paper);
+  --keycap-text: var(--color-ink);
+  --primary: var(--color-ink);
 }
 .formula-picker-heading {
   padding: 10px 14px;
@@ -467,7 +467,7 @@
 }
 .formula-grid > button:hover {
   background: var(--green-light);
-  border-color: #9ca98c;
+  border-color: var(--color-faint);
 }
 .formula-grid small {
   display: block;
@@ -500,9 +500,9 @@
   border-radius: 4px;
   background: var(--bg);
   color: var(--ink);
-  --selection-background-color: #cdd8c1;
-  --caret-color: #4b6241;
-  --contains-highlight-background-color: #e9eddf;
+  --selection-background-color: var(--color-blue-soft);
+  --caret-color: var(--color-ink);
+  --contains-highlight-background-color: var(--color-blue-wash);
 }
 .formula-mathfield math-field::part(menu-toggle) {
   display: none;

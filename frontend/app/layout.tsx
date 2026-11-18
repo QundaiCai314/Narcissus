@@ -6,6 +6,7 @@ import "./study.css";
 import "./composer.css";
 import "./mindmap.css";
 import "./parity.css";
+import "./theme.css";
 
 export const metadata: Metadata = {
   title: "Narcissus · 从阅读到理解",

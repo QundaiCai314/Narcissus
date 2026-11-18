@@ -324,7 +324,7 @@ export function MindMap({
                   key={"link" + n.node.id}
                   d={`M${parent.x + 220} ${parent.y + parent.height / 2} C${parent.x + 255} ${parent.y + parent.height / 2},${n.x - 35} ${n.y + n.height / 2},${n.x} ${n.y + n.height / 2}`}
                   fill="none"
-                  stroke="#b0c7b5"
+                  stroke="var(--color-blue)"
                   strokeWidth="2"
                 />
               ) : null;
