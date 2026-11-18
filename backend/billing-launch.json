@@ -1,0 +1,8 @@
+{
+  "products": [
+    {"id": "reading_month", "title": "研读月会员", "kind": "membership", "amount_cents": 2990, "member_days": 30, "credits": 0},
+    {"id": "learning_100", "title": "100 学习额度", "kind": "credits", "amount_cents": 990, "member_days": 0, "credits": 100}
+  ],
+  "credit_costs": {"quiz": 5, "mindmap": 3, "flashcards": 2},
+  "member_daily_limit": 20
+}

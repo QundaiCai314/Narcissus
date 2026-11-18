@@ -1,0 +1,23 @@
+# Only add this overlay after the user has locally prepared the production SDK JSON.
+# The file is mounted read-only, never embedded in an image or committed to Git.
+x-alipay-secret: &alipay-secret
+  type: bind
+  source: ${ALIPAY_PRODUCTION_CONFIG_HOST:?Set the absolute path to your protected production SDK JSON}
+  target: /run/secrets/narcissus-alipay.json
+  read_only: true
+services:
+  api:
+    environment:
+      ALIPAY_PRODUCTION_CONFIG: /run/secrets/narcissus-alipay.json
+    volumes:
+      - *alipay-secret
+  worker:
+    environment:
+      ALIPAY_PRODUCTION_CONFIG: /run/secrets/narcissus-alipay.json
+    volumes:
+      - *alipay-secret
+  beat:
+    environment:
+      ALIPAY_PRODUCTION_CONFIG: /run/secrets/narcissus-alipay.json
+    volumes:
+      - *alipay-secret

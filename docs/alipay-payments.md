@@ -12,6 +12,10 @@
 
 ## 配置
 
+`BILLING_PROFILE=launch` 使用 `backend/billing-launch.json` 中的首发规则：¥29.90／30天会员、每日20次学习生成免扣；¥9.90／100额度包；非会员测验、导图、闪卡每份分别5、3、2额度。会员次数按北京时间零点重置，失败或取消会返还，当日用完后不会自动改扣余额。该选择不会自行打开支付或扣费，公网部署与剩余条件见 [上线说明](production-launch.md)。
+
+`BILLING_PROFILE=custom` 才使用下面的 `BILLING_PRODUCTS_JSON` 与 `BILLING_CREDIT_COSTS_JSON`；其会员每日次数由 `BILLING_MEMBER_DAILY_LIMIT` 指定。
+
 将配置保存在本地被 Git 忽略的 `.env`。价格由你决定后填写 `BILLING_PRODUCTS_JSON`，数组每项包含：
 
 | 字段 | 说明 |

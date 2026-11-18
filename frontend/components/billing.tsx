@@ -36,6 +36,7 @@ export function BillingOrderDetails({ order }: { order: BillingOrder }) {
     <div><dt>订单编号</dt><dd className="billing-order-id">{order.id}</dd></div>
     <div><dt>创建时间</dt><dd>{billingDate(order.created_at)}</dd></div>
     {order.kind === "membership" && <div><dt>会员有效期</dt><dd>{order.member_days} 天</dd></div>}
+    {order.kind === "membership" && order.member_daily_limit && <div><dt>每日免扣次数</dt><dd>{order.member_daily_limit} 次学习生成</dd></div>}
     {order.credits > 0 && <div><dt>{order.kind === "membership" ? "随单额度" : "学习额度"}</dt><dd>{order.credits} 额度</dd></div>}
   </dl>;
 }

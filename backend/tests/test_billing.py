@@ -5,7 +5,7 @@ import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace, dataclass, field
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import Mock
 import pytest
@@ -73,6 +73,7 @@ def ctx(monkeypatch):
     gateway=FakeGateway()
     config=settings()
     monkeypatch.setattr(config,'alipay_enabled',True)
+    monkeypatch.setattr(config,'billing_profile','custom')
     monkeypatch.setattr(config,'billing_products_json',json.dumps(PRODUCTS,ensure_ascii=False))
     monkeypatch.setattr(config,'billing_enforce_credits',True)
     monkeypatch.setattr(config,'billing_credit_costs_json','{"quiz":2,"mindmap":3,"flashcards":1}')
@@ -99,6 +100,77 @@ def test_learning_quote_matches_debit_and_member_waiver(ctx):
     assert response.json()['credits'] == 0
     paid(ctx,'test_member')
     assert ctx.client.get('/api/billing/learning-quote').json()['costs']['quiz'] == 0
+
+
+def test_launch_tariff_is_server_owned_and_does_not_enable_payments(ctx, monkeypatch):
+    monkeypatch.setattr(ctx.config, 'billing_profile', 'launch')
+    monkeypatch.setattr(ctx.config, 'alipay_enabled', False)
+    assert [(p.id, p.amount_cents, p.member_days, p.credits) for p in service.catalog()] == [
+        ('reading_month', 2990, 30, 0), ('learning_100', 990, 0, 100)]
+    assert {kind: service.credit_cost(kind) for kind in ('quiz', 'mindmap', 'flashcards')} == {
+        'quiz': 5, 'mindmap': 3, 'flashcards': 2}
+    assert service.member_daily_limit() == 20
+    assert ctx.client.get('/api/billing/catalog').json()['available'] is False
+
+
+def test_member_limit_releases_failed_slot_and_never_falls_back_to_credits(ctx, monkeypatch):
+    monkeypatch.setattr(ctx.config, 'billing_member_daily_limit', 2)
+    paid(ctx, 'test_member')
+    first, second, third = uid(), uid(), uid()
+    for request_key in (first, second):
+        with ctx.session() as db:
+            service.consume_credit(db, ctx.user.id, 'quiz', request_key); db.commit()
+    assert ctx.client.get('/api/billing/learning-quote').json()['member_daily_remaining'] == 0
+    with ctx.session() as db:
+        service.consume_credit(db, ctx.user.id, 'quiz', second); db.commit()
+        with pytest.raises(HTTPException) as error:
+            service.consume_credit(db, ctx.user.id, 'mindmap', third)
+        assert error.value.status_code == 429
+        db.rollback()
+        assert db.get(BillingAccount, ctx.user.id).credits == 5
+        service.restore_credit(db, first); db.commit()
+        service.restore_credit(db, first); db.commit()
+    assert ctx.client.get('/api/billing/learning-quote').json()['member_daily_remaining'] == 1
+    with ctx.session() as db:
+        service.consume_credit(db, ctx.user.id, 'mindmap', third); db.commit()
+        assert db.get(BillingAccount, ctx.user.id).credits == 5
+    assert ctx.client.get('/api/billing/learning-quote').json()['member_daily_remaining'] == 0
+
+
+def test_member_day_resets_at_china_midnight_and_does_not_count_paid_usage(ctx, monkeypatch):
+    monkeypatch.setattr(ctx.config, 'billing_member_daily_limit', 2)
+    before = datetime(2026, 11, 18, 15, 59, tzinfo=timezone.utc)
+    after = datetime(2026, 11, 18, 16, 0, tzinfo=timezone.utc)
+    with ctx.session() as db:
+        for kind, delta in [('quiz', 0), ('mindmap', -3)]:
+            db.add(BillingLedger(event_key='usage:' + uid(), user_id=ctx.user.id,
+                                 delta=delta, kind=kind, created_at=before))
+        db.commit()
+        assert service.member_daily_remaining(db, ctx.user.id, at=before) == 1
+        assert service.member_daily_remaining(db, ctx.user.id, at=after) == 2
+
+
+def test_member_allowance_isolated_by_account(ctx, monkeypatch):
+    monkeypatch.setattr(ctx.config, 'billing_member_daily_limit', 1)
+    with ctx.session() as db:
+        other = User(email=uid() + '@example.test', password_hash='synthetic')
+        db.add(other); db.flush()
+        db.add(BillingLedger(event_key='usage:' + uid(), user_id=other.id, delta=0, kind='quiz'))
+        db.commit()
+        assert service.member_daily_remaining(db, other.id) == 0
+        assert service.member_daily_remaining(db, ctx.user.id) == 1
+
+
+def test_nonmember_credit_pack_not_subject_to_member_daily_allowance(ctx, monkeypatch):
+    monkeypatch.setattr(ctx.config, 'billing_member_daily_limit', 1)
+    paid(ctx)
+    with ctx.session() as db:
+        for _ in range(3): service.consume_credit(db, ctx.user.id, 'quiz', uid())
+        db.commit()
+        assert db.get(BillingAccount, ctx.user.id).credits == 14
+    quote = ctx.client.get('/api/billing/learning-quote').json()
+    assert quote['member_active'] is False and quote['member_daily_remaining'] is None
+    assert quote['costs']['quiz'] == 2
 
 
 def test_disabled_learning_billing_quote_works_without_new_tables(ctx,monkeypatch):
@@ -392,4 +464,49 @@ def test_real_postgres_serializes_duplicate_payments():
             assert db.scalar(select(func.count()).select_from(BillingLedger))==1
     finally:
         with root.begin() as connection:connection.execute(text('DROP SCHEMA '+schema+' CASCADE'))
+        root.dispose()
+
+
+def test_real_postgres_serializes_member_daily_allowance(monkeypatch):
+    url = os.environ.get('BILLING_TEST_DATABASE_URL')
+    if not url: pytest.skip('Dedicated BILLING_TEST_DATABASE_URL required')
+    from sqlalchemy.engine import make_url
+    if make_url(url).database != 'narcissus_billing_test':
+        raise RuntimeError('Refusing allowance test outside the dedicated disposable database')
+    config = settings()
+    monkeypatch.setattr(config, 'billing_profile', 'custom')
+    monkeypatch.setattr(config, 'alipay_enabled', True)
+    monkeypatch.setattr(config, 'billing_enforce_credits', True)
+    monkeypatch.setattr(config, 'billing_member_daily_limit', 2)
+    monkeypatch.setattr(config, 'billing_credit_costs_json', '{"quiz":5}')
+    schema = 'allowance_' + uuid.uuid4().hex
+    root = create_engine(url)
+    with root.begin() as connection: connection.execute(text('CREATE SCHEMA ' + schema))
+    engine = root.execution_options(schema_translate_map={None:schema})
+    factory = sessionmaker(engine, expire_on_commit=False)
+    try:
+        for table in (User.__table__, *BILLING_TABLES): table.create(engine)
+        with factory() as db:
+            user = User(email=uid() + '@example.test', password_hash='synthetic')
+            db.add(user); db.flush(); user_id = user.id
+            db.add(BillingAccount(user_id=user.id, credits=100, member_until=now() + timedelta(days=1)))
+            db.commit()
+        def reserve(_):
+            with factory() as db:
+                try:
+                    service.consume_credit(db, user_id, 'quiz', uid()); db.commit()
+                    return True
+                except HTTPException as error:
+                    db.rollback()
+                    assert error.status_code == 429
+                    return False
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            results = list(pool.map(reserve, range(16)))
+        assert sum(results) == 2
+        with factory() as db:
+            assert db.get(BillingAccount, user_id).credits == 100
+            assert db.scalar(select(func.count()).select_from(BillingLedger)) == 2
+            assert service.member_daily_remaining(db, user_id) == 0
+    finally:
+        with root.begin() as connection: connection.execute(text('DROP SCHEMA ' + schema + ' CASCADE'))
         root.dispose()

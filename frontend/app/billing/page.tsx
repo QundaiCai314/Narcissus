@@ -7,8 +7,8 @@ import { billingDate, billingMoney, orderStatusLabels, type BillingOrder, type B
 import { BillingBook, BillingEmpty, BillingLoading, BillingSandboxNotice, BillingShell, BillingWindow } from "@/components/billing";
 import "./billing.css";
 
-type Catalog = { available: boolean; environment: string | null; products: BillingProduct[]; message?: string };
-type Wallet = { credits: number; member_until: string | null; member_active: boolean };
+type Catalog = { available: boolean; environment: string | null; products: BillingProduct[]; message?: string; member_daily_limit?: number; credit_costs?: Record<string, number> };
+type Wallet = { credits: number; member_until: string | null; member_active: boolean; member_daily_limit?: number; member_daily_remaining?: number | null };
 
 export default function Billing() {
   const [catalog, setCatalog] = useState<Catalog | null>(null), [wallet, setWallet] = useState<Wallet | null>(null);
@@ -70,20 +70,22 @@ export default function Billing() {
           {catalog?.available && <>
             <section className="billing-account" aria-label="账户权益">
               <div><span>可用额度</span><strong>{wallet?.credits ?? "—"}<small>额度</small></strong></div>
-              <div><span>会员状态</span><strong className="billing-member-state">{wallet ? wallet.member_active ? "使用中" : "未开通" : "—"}</strong>{wallet?.member_active && wallet.member_until && <small>至 {new Date(wallet.member_until).toLocaleDateString("zh-CN")}</small>}</div>
+              <div><span>会员状态</span><strong className="billing-member-state">{wallet ? wallet.member_active ? "使用中" : "未开通" : "—"}</strong>{wallet?.member_active && wallet.member_until && <small>至 {new Date(wallet.member_until).toLocaleDateString("zh-CN")}</small>}{wallet?.member_active && wallet.member_daily_remaining != null && <small>今日剩余 {wallet.member_daily_remaining} / {wallet.member_daily_limit} 次免扣</small>}</div>
             </section>
             <div className="billing-tabs" role="group" aria-label="商品类别"><button aria-pressed={kind === "membership"} onClick={() => setKind("membership")}>会员套餐</button><button aria-pressed={kind === "credits"} onClick={() => setKind("credits")}>使用额度</button></div>
             <div className="billing-products">{products.map((product) => <article className="billing-product" key={product.id}>
               <div className="billing-product-heading"><div><span className="billing-product-kind">{product.kind === "membership" ? "单次购买 · 不自动续费" : "按需补充 · 按次使用"}</span><h2>{product.title}</h2></div><p className="billing-price"><span>¥</span>{billingMoney(product.amount_cents)}</p></div>
               <ul className="billing-benefits">
                 <li><Check size={16} aria-hidden="true" />{product.kind === "membership" ? `${product.member_days} 天会员有效期` : `${product.credits} 额度，按需使用`}</li>
-                <li><Check size={16} aria-hidden="true" />{product.kind === "membership" ? "测验、导图与闪卡生成免扣额度" : "可用于测验、导图与闪卡生成"}</li>
+                <li><Check size={16} aria-hidden="true" />{product.kind === "membership" ? catalog.member_daily_limit ? `每日 ${catalog.member_daily_limit} 次测验、导图或闪卡生成免扣` : "测验、导图与闪卡生成免扣额度" : "可用于测验、导图与闪卡生成"}</li>
                 {product.kind === "membership" && product.credits > 0 && <li><Check size={16} aria-hidden="true" />同时获得 {product.credits} 额度</li>}
+                {product.kind === "membership" && catalog.member_daily_limit && <li><Check size={16} aria-hidden="true" />北京时间每日零点重置，失败或取消返还次数</li>}
               </ul>
+              {product.kind === "credits" && catalog.credit_costs && <dl className="billing-credit-rates">{[["quiz", "测验"], ["mindmap", "导图"], ["flashcards", "闪卡"]].map(([type, label]) => <div key={type}><dt>{label}</dt><dd>{catalog.credit_costs?.[type] ?? 0} 额度 / 次</dd></div>)}</dl>}
               <button className="billing-primary" disabled={!!busy} onClick={() => buy(product)}><span>{busy === product.id ? "正在创建订单…" : "确认订单"}</span><ArrowRight size={18} aria-hidden="true" /></button>
             </article>)}</div>
             {!products.length && <p className="billing-category-empty">该类别暂无上架商品，可以切换到另一类查看。</p>}
-            <p className="billing-policy">确认订单后，可选择支付宝付款。会员到期不会自动扣款，现有功能的使用上限仍适用。</p>
+            <p className="billing-policy">{kind === "membership" ? "会员到期不会自动扣款，每日免扣次数用完后次日恢复。" : "按成功生成的份数扣除额度，失败或取消会自动退回。"}现有并发与使用上限仍适用。</p>
           </>}
         </BillingWindow>
       </div>

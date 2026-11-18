@@ -1,0 +1,18 @@
+# Add HTTPS to a server deployment. No data services or existing volumes are changed.
+services:
+  proxy:
+    image: caddy:2-alpine
+    environment:
+      NARCISSUS_DOMAIN: ${NARCISSUS_DOMAIN:?Set your public hostname without https://}
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+volumes:
+  caddy-data:
+  caddy-config:

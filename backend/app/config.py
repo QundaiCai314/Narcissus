@@ -1,6 +1,6 @@
 from functools import lru_cache
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from urllib.parse import urlsplit, unquote
 from typing import Literal
 
@@ -96,6 +96,8 @@ class Settings(BaseSettings):
     alipay_production_config: str = ''
     alipay_notify_url: str = ''
     billing_products_json: str = '[]'
+    billing_profile: Literal['custom', 'launch'] = 'custom'
+    billing_member_daily_limit: int = Field(default=20, ge=1, le=1000)
     billing_operator_emails: str = ''
     billing_credit_costs_json: str = '{}'
     billing_enforce_credits: bool = False

@@ -60,7 +60,8 @@ def catalog(db=Depends(db_session)):
     try:
         gateway = gateway_ready(db)
         return dict(available=True, products=[p.model_dump() for p in service.catalog()],
-                    environment=gateway.config.environment)
+                    environment=gateway.config.environment, member_daily_limit=service.member_daily_limit(),
+                    credit_costs={kind: service.credit_cost(kind) for kind in ('quiz', 'mindmap', 'flashcards')})
     except Exception:
         return dict(available=False, products=[], environment=None, message='收款暂不可用，请稍后再试')
 
@@ -69,8 +70,10 @@ def catalog(db=Depends(db_session)):
 def wallet(user=Depends(current_user), db=Depends(db_session)):
     gateway_ready(db)
     account = db.get(BillingAccount, user.id)
+    member = bool(account and account.member_until and service.utc(account.member_until) > now())
     return dict(credits=account.credits if account else 0, member_until=account.member_until if account else None,
-                member_active=bool(account and account.member_until and service.utc(account.member_until) > now()))
+                member_active=member, member_daily_limit=service.member_daily_limit(),
+                member_daily_remaining=service.member_daily_remaining(db, user.id) if member else None)
 
 
 @router.get('/learning-quote')

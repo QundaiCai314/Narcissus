@@ -5,6 +5,7 @@ import re
 from datetime import timedelta, timezone
 from decimal import Decimal
 from uuid import uuid4
+from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
 from sqlalchemy import select, or_, inspect, func, literal
 from sqlalchemy.orm import aliased
@@ -35,9 +36,24 @@ class Product(BaseModel):
         return self
 
 
+def launch_policy():
+    """A public, versioned tariff; switching profiles never enables payments."""
+    try:
+        return json.loads((Path(__file__).resolve().parents[1] / 'billing-launch.json').read_text(encoding='utf-8'))
+    except Exception:
+        raise PaymentUnavailable('首发计费规则无法读取，请联系管理员') from None
+
+
+def member_daily_limit():
+    value = launch_policy()['member_daily_limit'] if settings().billing_profile == 'launch' else settings().billing_member_daily_limit
+    if type(value) is not int or not 1 <= value <= 1000:
+        raise PaymentUnavailable('会员每日次数配置无效，请联系管理员')
+    return value
+
+
 def catalog():
     try:
-        raw = json.loads(settings().billing_products_json)
+        raw = launch_policy()['products'] if settings().billing_profile == 'launch' else json.loads(settings().billing_products_json)
         if not isinstance(raw, list) or len(raw) > 20:
             raise ValueError()
         products = [Product.model_validate(item) for item in raw]
@@ -286,7 +302,7 @@ def send_or_query_refund(db, refund, gateway=None, send=False):
 
 def credit_cost(kind):
     try:
-        costs = json.loads(settings().billing_credit_costs_json)
+        costs = launch_policy()['credit_costs'] if settings().billing_profile == 'launch' else json.loads(settings().billing_credit_costs_json)
         if not isinstance(costs, dict):
             raise ValueError()
         cost = costs.get(kind, 0)
@@ -297,6 +313,24 @@ def credit_cost(kind):
         fail(503, 'billing_unavailable', '额度配置需要管理员核对')
 
 
+def member_daily_remaining(db, user_id, at=None):
+    """Successful and pending waived generations share one account/day allowance.
+
+    Restoring a failed or cancelled zero-cost reservation also releases its slot.
+    Existing user/account locks serialize reservations on PostgreSQL.
+    """
+    current = at or now()
+    start = current.astimezone(timezone(timedelta(hours=8))).replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
+    restored = aliased(BillingLedger)
+    used = db.scalar(select(func.count(BillingLedger.event_key))
+        .outerjoin(restored, restored.event_key == literal('restored:') + BillingLedger.event_key)
+        .where(BillingLedger.user_id == user_id, BillingLedger.delta == 0,
+               BillingLedger.kind.in_(('quiz', 'mindmap', 'flashcards')),
+               BillingLedger.event_key.like('usage:%'), BillingLedger.created_at >= start,
+               BillingLedger.created_at < start + timedelta(days=1), restored.event_key.is_(None))) or 0
+    return max(0, member_daily_limit() - used)
+
+
 def learning_quote(db, user_id):
     if not settings().billing_enforce_credits:
         return dict(enforced=False, costs={})
@@ -305,6 +339,8 @@ def learning_quote(db, user_id):
     account = db.get(BillingAccount, user_id)
     member = bool(account and account.member_until and utc(account.member_until) > now())
     return dict(enforced=True, credits=account.credits if account else 0, member_active=member,
+                member_daily_limit=member_daily_limit(),
+                member_daily_remaining=member_daily_remaining(db, user_id) if member else None,
                 costs={kind: 0 if member else credit_cost(kind) for kind in ('quiz', 'mindmap', 'flashcards')})
 
 
@@ -325,6 +361,8 @@ def consume_credit(db, user_id, kind, request_key):
             fail(409, 'idempotency_conflict', '请求标识已被使用')
         return
     if account.member_until and utc(account.member_until) > now():
+        if member_daily_remaining(db, user_id) == 0:
+            fail(429, 'member_daily_limit', '今日会员免扣次数已用完，请在北京时间明天零点后继续；本次没有扣除额度')
         cost = 0
     if account.credits < cost:
         fail(402, 'insufficient_credits', '使用额度不足，可前往会员与额度页面购买')
@@ -350,7 +388,8 @@ def order_view(order):
     return dict(id=order.id, product_id=order.product_id, title=order.title, kind=order.kind,
         amount_cents=order.amount_cents, credits=order.credits, member_days=order.member_days,
         status=order.status, environment=order.environment, created_at=order.created_at,
-        paid_at=order.paid_at, confirmation_pending=bool(order.check_error))
+        paid_at=order.paid_at, confirmation_pending=bool(order.check_error),
+        member_daily_limit=member_daily_limit() if order.kind == 'membership' else None)
 
 
 def reconcile(session_factory, limit=20):

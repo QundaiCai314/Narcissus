@@ -69,7 +69,7 @@ export function LearningPanel({
   const [libraryOpen, setLibraryOpen] = useState(false);
   const stepTitle = useRef<HTMLHeadingElement>(null);
   const [quizAvailable, setQuizAvailable] = useState<boolean | null>(null);
-  const [creditQuote, setCreditQuote] = useState<{enforced: boolean; credits?: number; member_active?: boolean; costs: Partial<Record<LearningKind, number>>} | null>(null);
+  const [creditQuote, setCreditQuote] = useState<{enforced: boolean; credits?: number; member_active?: boolean; member_daily_limit?: number; member_daily_remaining?: number | null; costs: Partial<Record<LearningKind, number>>} | null>(null);
   useEffect(() => {
     if (!form) return;
     let alive = true;
@@ -82,6 +82,10 @@ export function LearningPanel({
   async function confirmCreditCost(target: LearningKind) {
     const quote = await api<NonNullable<typeof creditQuote>>("/billing/learning-quote");
     setCreditQuote(quote);
+    if (quote.enforced && quote.member_active && quote.member_daily_remaining === 0) {
+      setError("今日会员免扣次数已用完，请在北京时间明天零点后继续；本次没有扣除额度。");
+      return false;
+    }
     const cost = quote.costs[target] || 0;
     return !quote.enforced || !cost || window.confirm(`本次生成将使用 ${cost} 额度（当前剩余 ${quote.credits ?? 0}）。生成失败或取消后自动退回。确认继续？`);
   }
@@ -767,7 +771,7 @@ export function LearningPanel({
               className={`learning-toolbar ${kind === "quiz" ? "quiz-wizard-footer" : ""}`}
             >
               {creditQuote?.enforced && <p className="muted" role="status">
-                {creditQuote.member_active ? "会员有效期内，本次生成免额度。" : `本次使用 ${creditQuote.costs[kind] || 0} 额度 · 剩余 ${creditQuote.credits ?? 0}，失败或取消自动退回。`}
+                {creditQuote.member_active ? creditQuote.member_daily_remaining === 0 ? "今日会员免扣次数已用完，明日零点恢复。" : `本次生成免额度${creditQuote.member_daily_remaining != null ? ` · 今日剩余 ${creditQuote.member_daily_remaining} 次，失败或取消返还次数。` : "。"}` : `本次使用 ${creditQuote.costs[kind] || 0} 额度 · 剩余 ${creditQuote.credits ?? 0}，失败或取消自动退回。`}
               </p>}
               {kind === "quiz" && (
                 <span className="quiz-wizard-summary">

@@ -12,6 +12,7 @@ export type BillingOrder = BillingProduct & {
   created_at: string;
   environment: string;
   confirmation_pending?: boolean;
+  member_daily_limit?: number | null;
 };
 
 export const orderStatusLabels: Record<string, string> = {
